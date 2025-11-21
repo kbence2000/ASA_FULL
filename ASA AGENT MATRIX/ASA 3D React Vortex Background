@@ -1,0 +1,35 @@
+useEffect(() => {
+  const canvas = document.getElementById("vortexCanvas");
+  const ctx = canvas.getContext("2d");
+
+  function resize() {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  let t = 0;
+  function draw() {
+    t += 0.005;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (let i = 0; i < 200; i++) {
+      const angle = i * 0.1 + t;
+      const x = w/2 + Math.cos(angle) * (i * 2);
+      const y = h/2 + Math.sin(angle) * (i * 2);
+
+      ctx.fillStyle = `rgba(0, 246, 255, ${1 - i/200})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+
+}, []);
