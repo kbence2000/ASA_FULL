@@ -1,0 +1,46 @@
+<script>
+/* ================================
+   ASA AGENT MATRIX - Evolution Engine
+   ================================ */
+
+const MATRIX = {
+  version: "1.0",
+  evolutionIndex: 0,
+  lastHealth: 80,
+  lastSkillAvg: 75,
+  history: [],
+
+  evolve(agents) {
+    const avgSkill = agents.reduce((a,b)=>a + (
+      (b.skills.recon + b.skills.ops + b.skills.tactics + b.skills.engineering)/4
+    ),0)/agents.length;
+
+    const avgLoad = agents.reduce((a,b)=>a + b.load, 0) / agents.length;
+
+    const evolution = {
+      cycle: this.evolutionIndex++,
+      timestamp: new Date().toISOString(),
+      avgSkill: avgSkill.toFixed(2),
+      avgLoad: avgLoad.toFixed(2),
+      deltaSkill: (avgSkill - this.lastSkillAvg).toFixed(2),
+      deltaHealth: (avgSkill - avgLoad).toFixed(2)  
+    };
+
+    this.history.push(evolution);
+    if (this.history.length > 20) this.history.shift();
+
+    this.lastSkillAvg = avgSkill;
+
+    document.getElementById("matrixEvolutionState").textContent =
+      JSON.stringify(evolution, null, 2);
+  }
+};
+
+setInterval(()=>{
+  MATRIX.evolve(agents);
+}, 5000); // 5 mp-enként evolúciós ciklus
+
+document.getElementById("matrixForceEvolve").onclick=()=>{
+  MATRIX.evolve(agents);
+};
+</script>
