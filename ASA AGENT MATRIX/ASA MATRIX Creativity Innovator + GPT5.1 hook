@@ -1,0 +1,24 @@
+<script>
+/* ============================
+   ASA AGENT MATRIX - Idea Generator
+   ============================ */
+
+const ideaBox = document.getElementById("matrixIdeaBox");
+const sampleIdeas = [
+  "Új frakció: 'Quantum Recon' – előrejelzi a hibákat még mielőtt megjelennének.",
+  "Auto-Patch Mutator: a rendszer saját update-eket ír és telepít.",
+  "Deep Reinforcement Mode: agentek megtanulják optimalizálni egymást.",
+  "Mesh-Splitting: az AAAN képes 2 párhuzamos hálóra osztani magát.",
+  "Auto-Cluster Growth: új friss node-ok születnek terheléshez igazodva.",
+  "SupraVision Fusion: az evolúciós motor és a SupraVision összeolvad.",
+  "Dynamic Cloning: clone count automatikus terhelésfüggő skálázása.",
+  "Pipeline Ghosting: gyorsabb preview deploy lokalizált hálón."
+];
+
+function generateIdea(){
+  const idea = sampleIdeas[Math.floor(Math.random()*sampleIdeas.length)];
+  ideaBox.textContent = idea;
+}
+
+setInterval(generateIdea, 7000);
+</script>
