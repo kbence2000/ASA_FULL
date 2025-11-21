@@ -1,65 +1,226 @@
-worker.ts – Cloudflare Worker entrypoint példának
-
-import { SupraVision } from "./asa-supravision";
-import { ASA_AAAN } from "./asa-aaan";
-import { createGithubAiRefactorAgent } from "./agents/github-ai-refactor";
-
 export default {
-  async fetch(request: Request, env: any, ctx: ExecutionContext) {
-    const supra = new SupraVision();
-    const aaan = new ASA_AAAN(supra, {
-      minScoreDeltaToCommit: 2,
-      allowHighRiskAgents: false,
-    });
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const path = url.searchParams.get("file");
+    const method = request.method;
 
-    aaan.registerAgent(createGithubAiRefactorAgent(env));
+    // ROUTES
+    if (url.pathname === "/api/diff") return diffFile(path, env);
+    if (url.pathname === "/api/harmonize") return harmonizeFile(path, env);
+    if (url.pathname === "/api/apply") return applyPatch(path, env);
+    if (url.pathname === "/api/status") return json({ status: "ASA MATRIX RUNNING" });
 
-    const ctxImpl = {
-      fetch,
-      log: (msg: string, extra?: any) =>
-        console.log("[ASA-AAAN]", msg, extra ?? ""),
-      getMetrics: async () => {
-        // IDE jön: CF Worker logok, Base44 health endpoint, GitHub CI metrics, stb.
-        // Most egy dummy példa:
-        return [
-          {
-            ts: Date.now(),
-            source: "worker:asa-bridge",
-            kind: "latency",
-            value: 620,
-          },
-          {
-            ts: Date.now(),
-            source: "worker:asa-bridge",
-            kind: "error_rate",
-            value: 0.03,
-          },
-        ];
-      },
-      applyChange: async (plan) => {
-        // Itt csinálod a valódi dolgokat:
-        // - GitHub API: patch + commit + push
-        // - Base44 API: pipeline / env update
-        // - CF: Wrangler API hívás
-        console.log("Applying change plan:", plan.description);
-      },
-    };
-
-    const results = await aaan.runOnce(ctxImpl);
-
-    return new Response(
-      JSON.stringify(
-        {
-          status: "ok",
-          results,
-        },
-        null,
-        2,
-      ),
-      { headers: { "content-type": "application/json" } },
-    );
-  },
+    return new Response("workflow-slave ONLINE", { status: 200 });
+  }
 };
+
+/* ---------------------------------------------------------
+   1. FETCH FILE FROM GITHUB
+--------------------------------------------------------- */
+async function fetchGithubFile(path, env) {
+  const res = await fetch(
+    `https://raw.githubusercontent.com/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/${env.BASE_BRANCH}/${path}`,
+    {
+      headers: {
+        "Authorization": `token ${env.GITHUB_TOKEN}`
+      }
+    }
+  );
+
+  if (!res.ok) return null;
+  return await res.text();
+}
+
+/* ---------------------------------------------------------
+   2. DIFF GENERATOR (LINE-BY-LINE)
+--------------------------------------------------------- */
+function generateDiff(original, harmonized) {
+  const o = original.split("\n");
+  const h = harmonized.split("\n");
+
+  let out = "";
+
+  for (let i = 0; i < Math.max(o.length, h.length); i++) {
+    if (o[i] !== h[i]) {
+      out += `- ${o[i] ?? ""}\n+ ${h[i] ?? ""}\n`;
+    }
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------
+   3. /api/diff — FILE DIFF PREVIEW
+--------------------------------------------------------- */
+async function diffFile(path, env) {
+  const file = await fetchGithubFile(path, env);
+  if (!file) return json({ error: "File not found" }, 404);
+
+  const fakeHarmonized = file; // initial pass, actual via AI later
+  const diff = generateDiff(file, fakeHarmonized);
+
+  return json({ diff });
+}
+
+/* ---------------------------------------------------------
+   4. /api/harmonize — OPENAI HARMONIZER
+--------------------------------------------------------- */
+async function harmonizeFile(path, env) {
+  const file = await fetchGithubFile(path, env);
+  if (!file) return json({ error: "File not found" });
+
+  const prompt = `
+You are the ASA MATRIX Code Harmonizer.
+Improve, clean, correct, modularize this code while keeping logic identical.
+
+CODE:
+${file}
+  `;
+
+  const ai = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1",
+      input: prompt
+    })
+  }).then(r => r.json());
+
+  const harmonized = ai.output_text || file;
+  const diff = generateDiff(file, harmonized);
+
+  return json({ harmonized, diff });
+}
+
+/* ---------------------------------------------------------
+   5. /api/apply — CREATE PR → AUTO MERGE → ASA AGENT RUN
+--------------------------------------------------------- */
+async function applyPatch(path, env) {
+  const file = await fetchGithubFile(path, env);
+  if (!file) return json({ error: "Not found" });
+
+  // 1) Harmonize again
+  const prompt = `
+You are the ASA MATRIX Code Harmonizer.
+Perfect the code for production environment ONLY.
+
+CODE:
+${file}
+  `;
+
+  const ai = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1",
+      input: prompt
+    })
+  }).then(r => r.json());
+
+  const harmonized = ai.output_text;
+
+  // 2) CREATE BRANCH
+  const branchName = `asa-harmonizer-${Date.now()}`;
+  await githubCreateBranch(env, branchName);
+
+  // 3) UPDATE FILE
+  await githubUpdateFile(env, branchName, path, harmonized);
+
+  // 4) CREATE PR
+  const pr = await githubCreatePR(env, branchName, path);
+
+  // 5) AUTO MERGE
+  await githubAutoMerge(env, pr.number);
+
+  // 6) ASA AGENT TRIGGER
+  await fetch(env.ASA_AGENT_ENDPOINT, {
+    method: "POST",
+    body: JSON.stringify({ event: "HARMONIZER_APPLIED", file: path })
+  });
+
+  return json({ ok: true, pr_url: pr.html_url });
+}
+
+/* ---------------------------------------------------------
+   GITHUB HELPERS
+--------------------------------------------------------- */
+async function githubCreateBranch(env, branch) {
+  return fetch(`https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/git/refs`, {
+    method: "POST",
+    headers: githubHeaders(env),
+    body: JSON.stringify({
+      ref: `refs/heads/${branch}`,
+      sha: await getHeadSHA(env)
+    })
+  });
+}
+
+async function githubUpdateFile(env, branch, path, content) {
+  return fetch(`https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${path}`, {
+    method: "PUT",
+    headers: githubHeaders(env),
+    body: JSON.stringify({
+      message: "ASA Harmonizer update",
+      content: btoa(content),
+      branch
+    })
+  });
+}
+
+async function githubCreatePR(env, branch) {
+  const res = await fetch(`https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/pulls`, {
+    method: "POST",
+    headers: githubHeaders(env),
+    body: JSON.stringify({
+      title: "ASA Harmonizer Auto-PR",
+      head: branch,
+      base: env.BASE_BRANCH
+    })
+  });
+  return await res.json();
+}
+
+async function githubAutoMerge(env, prNumber) {
+  return fetch(`https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/pulls/${prNumber}/merge`, {
+    method: "PUT",
+    headers: githubHeaders(env),
+    body: JSON.stringify({
+      commit_title: "Auto-merged by ASA Matrix"
+    })
+  });
+}
+
+async function getHeadSHA(env) {
+  const res = await fetch(
+    `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/git/refs/heads/${env.BASE_BRANCH}`,
+    { headers: githubHeaders(env) }
+  );
+  const data = await res.json();
+  return data.object.sha;
+}
+
+/* ---------------------------------------------------------
+   UTILITIES
+--------------------------------------------------------- */
+function githubHeaders(env) {
+  return {
+    "Authorization": `token ${env.GITHUB_TOKEN}`,
+    "Accept": "application/vnd.github+json",
+    "Content-Type": "application/json"
+  };
+}
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
 name = "workflow-slave"
 main = "worker.js"
