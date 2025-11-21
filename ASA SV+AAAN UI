@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ASA Dashboard — SupraVision + AAAN</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+/* ——— GLOBAL ——— */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  color: #d7f9ff;
+  font-family: "Inter", sans-serif;
+  overflow: hidden;
+}
+
+* { box-sizing: border-box; }
+
+/* ——— HOLOGRAPHIC GRID BACKGROUND ——— */
+body::before {
+  content: "";
+  position: fixed;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  background: radial-gradient(circle at center,
+    rgba(0, 255, 255, 0.12),
+    rgba(0,180,220,0.05),
+    transparent 70%
+  );
+  animation: pulse 8s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.8; }
+}
+
+/* ——— HOLO PANEL BASE STYLE ——— */
+.holo-panel {
+  border: 1px solid rgba(0,255,255,0.25);
+  border-radius: 12px;
+  padding: 18px;
+  backdrop-filter: blur(8px);
+  background: rgba(0, 25, 35, 0.4);
+  box-shadow: 0 0 20px rgba(0,255,255,0.2);
+}
+
+/* ——— LAYOUT ——— */
+#root {
+  display: grid;
+  grid-template-columns: 240px auto 300px;
+  grid-template-rows: auto 280px;
+  gap: 16px;
+  height: 100vh;
+  padding: 16px;
+}
+
+/* SIDEBAR */
+#sidebar {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sidebar-item {
+  padding: 12px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: 0.2s;
+}
+
+.sidebar-item:hover {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+/* SUPRAVISION PANEL */
+#sv-panel {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+/* AGENT MESH */
+#mesh-panel {
+  grid-column: 3;
+  grid-row: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+#mesh-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* ACTIVITY LOG */
+#activity {
+  grid-column: 1 / span 3;
+  grid-row: 2;
+  overflow-y: auto;
+}
+
+/* HEALTH GAUGE */
+#health-bar {
+  width: 100%;
+  height: 22px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+#health-fill {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, #00ffaa, #00f2ff);
+  transition: width 0.5s ease-out;
+}
+
+/* COLLAPSE RISK */
+#risk-indicator {
+  margin-top: 14px;
+  font-size: 18px;
+}
+
+/* ACTIVITY LOG STYLE */
+.log-entry {
+  margin-bottom: 8px;
+  padding: 8px;
+  border-left: 3px solid #00f2ff;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+
+.agent-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  margin-right: 6px;
+  background: rgba(0,255,255,0.15);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* MOBILE */
+@media(max-width: 900px) {
+  #root {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+}
+</style>
+
+</head>
+
+<body>
+<div id="root">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar" class="holo-panel">
+    <h2>ASA Dashboard</h2>
+    <div class="sidebar-item">SupraVision</div>
+    <div class="sidebar-item">AAAN Agents</div>
+    <div class="sidebar-item">Mesh Activity</div>
+    <div class="sidebar-item">AutoFix Queue</div>
+    <div class="sidebar-item">System Metrics</div>
+  </div>
+
+  <!-- SUPRAVISION PANEL -->
+  <div id="sv-panel" class="holo-panel">
+    <h2>SupraVision Status</h2>
+    <p>Real-time predictive system analysis</p>
+
+    <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="risk-indicator">Collapse risk: <span id="risk-val">0.12</span></div>
+
+    <h3>Predicted Next State:</h3>
+    <pre id="predicted" style="font-size:14px; white-space: pre-wrap;"></pre>
+  </div>
+
+  <!-- AGENT MESH PANEL -->
+  <div id="mesh-panel" class="holo-panel">
+    <canvas id="mesh-canvas"></canvas>
+  </div>
+
+  <!-- ACTIVITY LOG -->
+  <div id="activity" class="holo-panel">
+    <h2>Agent Activity Stream</h2>
+    <div id="log"></div>
+  </div>
+
+</div>
+
+<script>
+// ———————————————————————————————
+// 3D HOLOGRAPHIC MESH NETWORK
+// ———————————————————————————————
+
+const canvas = document.getElementById("mesh-canvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+const nodes = [];
+const L = 16;
+
+for (let i = 0; i < L; i++) {
+  nodes.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    vx: (Math.random() - 0.5) * 0.6,
+    vy: (Math.random() - 0.5) * 0.6,
+  });
+}
+
+function drawMesh() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // lines
+  for (let i=0; i<L; i++) {
+    for (let j=i+1; j<L; j++) {
+      const a = nodes[i];
+      const b = nodes[j];
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 220) {
+        ctx.strokeStyle = "rgba(0,255,255,"+(1 - dist/220)+")";
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // nodes
+  for (const n of nodes) {
+    ctx.fillStyle = "#00ffff";
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 3, 0, Math.PI*2);
+    ctx.fill();
+
+    n.x += n.vx;
+    n.y += n.vy;
+
+    if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
+    if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+  }
+
+  requestAnimationFrame(drawMesh);
+}
+drawMesh();
+
+
+// ———————————————————————————————
+// SUPRAVISION SIMULATION (FAKE DATA)
+// ———————————————————————————————
+
+function fakeSupra() {
+  const health = Math.floor(60 + Math.random()*30);
+  const collapse = (1 - health/100).toFixed(2);
+
+  document.getElementById("health-fill").style.width = health + "%";
+  document.getElementById("risk-val").innerText = collapse;
+
+  const predicted = {
+    expectedLatency: (Math.random()*60).toFixed(1),
+    expectedErrorRate: (Math.random()*0.02).toFixed(4),
+    expectedCPU: (Math.random()*45).toFixed(1)
+  };
+
+  document.getElementById("predicted").innerText =
+    JSON.stringify(predicted, null, 2);
+
+  addLog(`SupraVision update — HS:${health} | CR:${collapse}`);
+}
+
+setInterval(fakeSupra, 1800);
+
+
+// ———————————————————————————————
+// ACTIVITY LOG
+// ———————————————————————————————
+
+function addLog(msg) {
+  const parent = document.getElementById("log");
+  const el = document.createElement("div");
+  el.className = "log-entry";
+  el.innerHTML = `
+    <span class="agent-tag">AAAN</span>
+    ${msg}
+  `;
+  parent.prepend(el);
+}
+</script>
+
+</body>
+</html>
