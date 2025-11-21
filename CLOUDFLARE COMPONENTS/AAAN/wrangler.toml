@@ -1,0 +1,6 @@
+name = "asa-aaan-supra"
+main = "src/worker.ts"
+compatibility_date = "2025-11-21"
+
+[vars]
+# OPENAI_API_KEY = "..."  # CF dashboardon töltsd
