@@ -1,4 +1,4 @@
-name = "asa-directory-editor"
+name = "name = 'workflow-slave'"
 main = "src/asa-code-harmonizer-worker.js"
 compatibility_date = "2024-11-21"
 
