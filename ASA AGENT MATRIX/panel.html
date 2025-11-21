@@ -1,0 +1,48 @@
+<!-- === ASA AGENT MATRIX PANEL === -->
+<section id="matrix-panel" class="card" style="
+  margin-top:20px;border-radius:18px;
+  background:rgba(4,10,20,0.96);
+  border:1px solid rgba(0,255,200,0.28);
+  padding:16px;
+  box-shadow:0 0 25px rgba(0,255,200,0.16);
+">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <div style="font-size:12px;letter-spacing:0.2em;color:#7aa4b8;text-transform:uppercase;">
+        ASA AGENT MATRIX
+      </div>
+      <div style="font-size:15px;font-weight:600;">Self-Evolving Intelligence Core</div>
+    </div>
+
+    <button id="matrixForceEvolve" style="
+      background:linear-gradient(135deg,#19e3ff,#19ffb5);
+      padding:8px 14px;border-radius:14px;border:none;
+      color:#000;font-weight:600;cursor:pointer;
+    ">⚡ Force Evolution</button>
+  </div>
+
+  <!-- Evolution Stats -->
+  <div style="margin-top:14px;">
+    <div style="font-size:12px;color:#7ca7bd;margin-bottom:6px;">Evolution Status:</div>
+    <pre id="matrixEvolutionState" style="
+      background:rgba(0,0,0,0.65);padding:10px;border-radius:10px;
+      border:1px solid rgba(0,255,200,0.22);
+      font-size:11px;white-space:pre-wrap;color:#c8f8ff;
+      max-height:160px;overflow-y:auto;
+    ">Matrix is initializing…</pre>
+  </div>
+
+  <!-- Innovation Ideas -->
+  <div style="margin-top:14px;">
+    <div style="font-size:12px;color:#7ca7bd;margin-bottom:6px;">Next Innovation Idea:</div>
+    <div id="matrixIdeaBox" style="
+      font-size:13px;color:#e2f9ff;
+      background:rgba(0,30,45,0.65);
+      padding:12px;border-radius:10px;
+      border:1px solid rgba(0,255,200,0.22);
+      min-height:48px;
+    ">Waiting for idea…</div>
+  </div>
+
+</section>
