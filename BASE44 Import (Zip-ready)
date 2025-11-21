@@ -1,0 +1,17 @@
+// === BASE44 IMPORT (ZIP OR RAW SOURCE) ===
+async function base44RefinedSync(env: Env, sourceZip: ArrayBuffer) {
+  const res = await fetch(`${env.BASE44_API_URL}/import`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.BASE44_API_KEY}`,
+      "content-type": "application/octet-stream",
+    },
+    body: sourceZip,
+  });
+
+  const text = await res.text().catch(() => "");
+  let parsed = null;
+  try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+  return { ok: res.ok, status: res.status, body: parsed };
+}
