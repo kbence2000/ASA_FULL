@@ -47,3 +47,66 @@ BASE_BRANCH = "main"
 # Example CRON (disabled by default):
 # [triggers]
 # crons = ["*/5 * * * *"]
+
+worker.ts – Cloudflare Worker entrypoint példának
+
+import { SupraVision } from "./asa-supravision";
+import { ASA_AAAN } from "./asa-aaan";
+import { createGithubAiRefactorAgent } from "./agents/github-ai-refactor";
+
+export default {
+  async fetch(request: Request, env: any, ctx: ExecutionContext) {
+    const supra = new SupraVision();
+    const aaan = new ASA_AAAN(supra, {
+      minScoreDeltaToCommit: 2,
+      allowHighRiskAgents: false,
+    });
+
+    aaan.registerAgent(createGithubAiRefactorAgent(env));
+
+    const ctxImpl = {
+      fetch,
+      log: (msg: string, extra?: any) =>
+        console.log("[ASA-AAAN]", msg, extra ?? ""),
+      getMetrics: async () => {
+        // IDE jön: CF Worker logok, Base44 health endpoint, GitHub CI metrics, stb.
+        // Most egy dummy példa:
+        return [
+          {
+            ts: Date.now(),
+            source: "worker:asa-bridge",
+            kind: "latency",
+            value: 620,
+          },
+          {
+            ts: Date.now(),
+            source: "worker:asa-bridge",
+            kind: "error_rate",
+            value: 0.03,
+          },
+        ];
+      },
+      applyChange: async (plan) => {
+        // Itt csinálod a valódi dolgokat:
+        // - GitHub API: patch + commit + push
+        // - Base44 API: pipeline / env update
+        // - CF: Wrangler API hívás
+        console.log("Applying change plan:", plan.description);
+      },
+    };
+
+    const results = await aaan.runOnce(ctxImpl);
+
+    return new Response(
+      JSON.stringify(
+        {
+          status: "ok",
+          results,
+        },
+        null,
+        2,
+      ),
+      { headers: { "content-type": "application/json" } },
+    );
+  },
+};
