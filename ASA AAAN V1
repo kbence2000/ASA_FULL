@@ -1,99 +1,174 @@
-// src/aaanGodTier.ts
-// ASA Autonomous Agent Network — GOD-TIER EDITION
-// Each agent has: ID, capabilities, priority, execution rules, self-check feedback loops.
-// SupraVision provides predictive state => AAAN decides which agent acts.
+// src/asa-aaan.ts
+// ASA Autonomous Agent Network – v1 "god tier" skeleton
+// SupraVisionre drótozva, auto-improvement only
 
-import { SupraVisionCore, SVSignal } from "./supraVisionCore";
+import {
+  SupraVision,
+  MetricSample,
+  HealthSnapshot,
+  ChangeProposal,
+  ImpactReport,
+} from "./asa-supravision";
 
-export interface AgentTask {
-  type: string;
+export interface AgentContext {
+  // pl. env, HTTP fetch, log callback:
+  fetch: typeof fetch;
+  log: (msg: string, extra?: any) => void;
+  getMetrics: () => Promise<MetricSample[]>;
+  // pl. Git / Base44 / CF integrációs callbackek:
+  applyChange: (change: AgentChangePlan) => Promise<void>;
+}
+
+export type AgentKind =
+  | "github_refactor"
+  | "base44_pipeline_tune"
+  | "cf_worker_optimize"
+  | "ai_inference_tune"
+  | "custom";
+
+export interface AgentChangePlan {
+  description: string;
+  // pl. file patch, config diff, env változás stb.
   payload: any;
-  priority: number;   // 1 = high, 5 = low
+}
+
+export interface AgentDecision {
+  shouldApply: boolean;
+  plan?: AgentChangePlan;
+  reason?: string;
+}
+
+export interface AgentIdentity {
+  id: string;
+  kind: AgentKind;
+  displayName: string;
+  maxRiskLevel: "LOW" | "MEDIUM" | "HIGH";
 }
 
 export interface Agent {
-  id: string;
-  title: string;
-  capability: string[];
-  run(task: AgentTask): Promise<AAANActionResult>;
+  meta: AgentIdentity;
+
+  /**
+   * Elemzi az aktuális metrikanézetet, és eldönti,
+   * hogy érdemes-e beavatkozni.
+   */
+  analyze: (ctx: AgentContext) => Promise<AgentDecision>;
+
+  /**
+   * Opcionális self-report / explainability.
+   */
+  explain?: (decision: AgentDecision) => Promise<string>;
 }
 
-export interface AAANActionResult {
-  success: boolean;
-  msg: string;
-  updatedFiles?: Record<string, string>;
-  metrics?: any;
+export interface AAANConfig {
+  minScoreDeltaToCommit?: number;
+  allowHighRiskAgents?: boolean;
 }
 
-export class AAANGodTier {
-  private agents: Map<string, Agent> = new Map();
-  private supra: SupraVisionCore;
+export interface ExecutionResult {
+  agentId: string;
+  proposal: ChangeProposal | null;
+  impact: ImpactReport | null;
+  skipped: boolean;
+  reason?: string;
+}
 
-  constructor(supraInstance: SupraVisionCore) {
-    this.supra = supraInstance;
+export class ASA_AAAN {
+  private supra: SupraVision;
+  private agents: Agent[] = [];
+  private cfg: Required<AAANConfig>;
+
+  constructor(supra: SupraVision, cfg?: AAANConfig) {
+    this.supra = supra;
+    this.cfg = {
+      minScoreDeltaToCommit: cfg?.minScoreDeltaToCommit ?? 2,
+      allowHighRiskAgents: cfg?.allowHighRiskAgents ?? false,
+    };
   }
 
   registerAgent(agent: Agent) {
-    this.agents.set(agent.id, agent);
+    this.agents.push(agent);
   }
 
-  ingestSignal(s: SVSignal) {
-    this.supra.ingest(s);
+  listAgents(): AgentIdentity[] {
+    return this.agents.map(a => a.meta);
   }
 
-  /** CORE LOGIC —
-   * SupraVision dönt → AAAN kiválasztja a megfelelő agentet.
+  /**
+   * Core futtató loop: végigmegy az agenteken,
+   * mindegyikre lefuttatja a "propose -> apply -> measure" ciklust.
    */
-  async tick(): Promise<{
-    supra: ReturnType<SupraVisionCore["predict"]>;
-    chosenAgent?: string;
-    result?: AAANActionResult;
-  }> {
-    const prediction = this.supra.predict();
+  async runOnce(ctx: AgentContext): Promise<ExecutionResult[]> {
+    const results: ExecutionResult[] = [];
 
-    let chosen: Agent | undefined;
+    const baseMetrics = await ctx.getMetrics();
+    const before = this.supra.evaluate(baseMetrics);
 
-    if (prediction.healthScore > 70) {
-      // ok state, no action needed
-      return { supra: prediction };
-    }
+    for (const agent of this.agents) {
+      const { meta } = agent;
 
-    if (prediction.healthScore > 45) {
-      chosen = this.getAgentByCapability("optimize");
-    } else {
-      chosen = this.getAgentByCapability("stabilize");
-    }
+      // Risk gating
+      if (meta.maxRiskLevel === "HIGH" && !this.cfg.allowHighRiskAgents) {
+        results.push({
+          agentId: meta.id,
+          proposal: null,
+          impact: null,
+          skipped: true,
+          reason: "High risk agent execution disabled by config",
+        });
+        continue;
+      }
 
-    if (!chosen) {
-      return {
-        supra: prediction,
-        chosenAgent: undefined,
-        result: { success: false, msg: "NO AGENT AVAILABLE" }
+      ctx.log(`AAAN: analyzing with agent ${meta.id} (${meta.displayName})`);
+
+      const decision = await agent.analyze(ctx);
+
+      if (!decision.shouldApply || !decision.plan) {
+        results.push({
+          agentId: meta.id,
+          proposal: null,
+          impact: null,
+          skipped: true,
+          reason: decision.reason ?? "Agent decided not to apply any change",
+        });
+        continue;
+      }
+
+      const proposal: ChangeProposal = {
+        id: `proposal_${meta.id}_${Date.now()}`,
+        description: decision.plan.description,
+        author: `agent:${meta.id}`,
+        tags: { kind: meta.kind },
       };
+
+      ctx.log(
+        `AAAN: agent ${meta.id} proposes change: ${decision.plan.description}`,
+      );
+
+      // 1) apply change (pl. git patch + commit)
+      await ctx.applyChange(decision.plan);
+
+      // 2) újramérés
+      const afterMetrics = await ctx.getMetrics();
+      const after = this.supra.evaluate(afterMetrics);
+
+      // 3) impact report
+      const impact = this.supra.compare(proposal, before, after);
+
+      let reason = impact.rationale;
+      if (impact.deltaScore < this.cfg.minScoreDeltaToCommit) {
+        reason += ` | Below commit delta threshold (${this.cfg.minScoreDeltaToCommit}).`;
+      }
+
+      results.push({
+        agentId: meta.id,
+        proposal,
+        impact,
+        skipped: impact.deltaScore < this.cfg.minScoreDeltaToCommit,
+        reason,
+      });
     }
 
-    const task: AgentTask = {
-      type:
-        prediction.healthScore > 45
-          ? "performance_opt"
-          : "stability_hotfix",
-      payload: prediction,
-      priority: prediction.healthScore > 45 ? 3 : 1
-    };
-
-    const result = await chosen.run(task);
-
-    return {
-      supra: prediction,
-      chosenAgent: chosen.id,
-      result
-    };
-  }
-
-  private getAgentByCapability(cap: string): Agent | undefined {
-    for (const agent of this.agents.values()) {
-      if (agent.capability.includes(cap)) return agent;
-    }
-    return undefined;
+    return results;
   }
 }
