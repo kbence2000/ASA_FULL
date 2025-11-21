@@ -1,0 +1,124 @@
+// src/supraVisionCore.ts
+// ASA SUPRAVISION ENGINE — CORE BRAIN
+// Predictive signals, ghost-data correction, anomaly synthesis, pre-emptive scoring.
+
+export interface SVSignal {
+  source: string;
+  latency?: number;
+  errorRate?: number;
+  cpu?: number;
+  memory?: number;
+  throughput?: number;
+  missing?: boolean;
+  timestamp?: number;
+}
+
+export interface SVPrediction {
+  healthScore: number;        // 0–100
+  collapseRisk: number;       // 0–1 (1 = imminent)
+  recommendedFix: string;     // human readable summary
+  ghostMapUsed: boolean;      // reconstructed from missing data
+  reconstructedFields: string[];
+  predictedNextState: any;    // short summary for AAAN
+}
+
+export class SupraVisionCore {
+  private samples: SVSignal[] = [];
+
+  ingest(sample: SVSignal) {
+    sample.timestamp = Date.now();
+    this.samples.push(sample);
+    if (this.samples.length > 250) this.samples.shift(); // ring buffer
+  }
+
+  /** Ghost Data Maker — dark-state reconstruction */
+  private reconstructMissing(sample: SVSignal): {
+    reconstructed: SVSignal;
+    fields: string[];
+  } {
+    const fields: string[] = [];
+    const base = { ...sample };
+
+    if (base.latency == null) {
+      base.latency = this.estimate("latency");
+      fields.push("latency");
+    }
+    if (base.errorRate == null) {
+      base.errorRate = this.estimate("errorRate");
+      fields.push("errorRate");
+    }
+    if (base.cpu == null) {
+      base.cpu = this.estimate("cpu");
+      fields.push("cpu");
+    }
+    if (base.memory == null) {
+      base.memory = this.estimate("memory");
+      fields.push("memory");
+    }
+    if (base.throughput == null) {
+      base.throughput = this.estimate("throughput");
+      fields.push("throughput");
+    }
+
+    return { reconstructed: base, fields };
+  }
+
+  /** Simple estimation from historical samples */
+  private estimate(key: keyof SVSignal): number {
+    const valid = this.samples.filter(s => typeof s[key] === "number");
+    if (valid.length === 0) return 0.5;
+    const avg =
+      valid.reduce((n, s) => n + (s[key] as number), 0) / valid.length;
+    return avg;
+  }
+
+  /** PREDICTIVE STATE ANALYSIS */
+  predict(): SVPrediction {
+    const latest = this.samples[this.samples.length - 1];
+    if (!latest) {
+      return {
+        healthScore: 50,
+        collapseRisk: 0.1,
+        ghostMapUsed: true,
+        recommendedFix: "Insufficient data – minimal auto-scaling recommended.",
+        reconstructedFields: [],
+        predictedNextState: {}
+      };
+    }
+
+    const { reconstructed, fields } = this.reconstructMissing(latest);
+
+    // scoring
+    let score = 100;
+    score -= reconstructed.latency! * 0.05;
+    score -= (reconstructed.errorRate! * 100) * 0.8;
+    score -= reconstructed.cpu! * 0.3;
+    score -= reconstructed.memory! * 0.25;
+    score -= reconstructed.throughput! * 0.01;
+
+    score = Math.max(0, Math.min(100, score));
+
+    // collapse risk = inverse sigmoid of score
+    const collapse = Number((1 / (1 + Math.exp((score - 55) / 4)))).toFixed(3);
+
+    return {
+      healthScore: score,
+      collapseRisk: Number(collapse),
+      ghostMapUsed: fields.length > 0,
+      reconstructedFields: fields,
+      recommendedFix:
+        score > 80
+          ? "No action necessary."
+          : score > 65
+          ? "Light optimization or cache warm-up recommended."
+          : score > 45
+          ? "Trigger AAAN auto-opt agent for pre-emptive patch."
+          : "Immediate AAAN stabilizer + hotfix pipeline required.",
+      predictedNextState: {
+        expectedLatency: reconstructed.latency! * 0.95,
+        expectedErrorRate: reconstructed.errorRate! * 0.98,
+        expectedCPU: reconstructed.cpu! * 0.93
+      }
+    };
+  }
+}
