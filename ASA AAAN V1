@@ -1,0 +1,99 @@
+// src/aaanGodTier.ts
+// ASA Autonomous Agent Network — GOD-TIER EDITION
+// Each agent has: ID, capabilities, priority, execution rules, self-check feedback loops.
+// SupraVision provides predictive state => AAAN decides which agent acts.
+
+import { SupraVisionCore, SVSignal } from "./supraVisionCore";
+
+export interface AgentTask {
+  type: string;
+  payload: any;
+  priority: number;   // 1 = high, 5 = low
+}
+
+export interface Agent {
+  id: string;
+  title: string;
+  capability: string[];
+  run(task: AgentTask): Promise<AAANActionResult>;
+}
+
+export interface AAANActionResult {
+  success: boolean;
+  msg: string;
+  updatedFiles?: Record<string, string>;
+  metrics?: any;
+}
+
+export class AAANGodTier {
+  private agents: Map<string, Agent> = new Map();
+  private supra: SupraVisionCore;
+
+  constructor(supraInstance: SupraVisionCore) {
+    this.supra = supraInstance;
+  }
+
+  registerAgent(agent: Agent) {
+    this.agents.set(agent.id, agent);
+  }
+
+  ingestSignal(s: SVSignal) {
+    this.supra.ingest(s);
+  }
+
+  /** CORE LOGIC —
+   * SupraVision dönt → AAAN kiválasztja a megfelelő agentet.
+   */
+  async tick(): Promise<{
+    supra: ReturnType<SupraVisionCore["predict"]>;
+    chosenAgent?: string;
+    result?: AAANActionResult;
+  }> {
+    const prediction = this.supra.predict();
+
+    let chosen: Agent | undefined;
+
+    if (prediction.healthScore > 70) {
+      // ok state, no action needed
+      return { supra: prediction };
+    }
+
+    if (prediction.healthScore > 45) {
+      chosen = this.getAgentByCapability("optimize");
+    } else {
+      chosen = this.getAgentByCapability("stabilize");
+    }
+
+    if (!chosen) {
+      return {
+        supra: prediction,
+        chosenAgent: undefined,
+        result: { success: false, msg: "NO AGENT AVAILABLE" }
+      };
+    }
+
+    const task: AgentTask = {
+      type:
+        prediction.healthScore > 45
+          ? "performance_opt"
+          : "stability_hotfix",
+      payload: prediction,
+      priority: prediction.healthScore > 45 ? 3 : 1
+    };
+
+    const result = await chosen.run(task);
+
+    return {
+      supra: prediction,
+      chosenAgent: chosen.id,
+      result
+    };
+  }
+
+  private getAgentByCapability(cap: string): Agent | undefined {
+    for (const agent of this.agents.values()) {
+      if (agent.capability.includes(cap)) return agent;
+    }
+    return undefined;
+  }
+}
