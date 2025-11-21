@@ -1,0 +1,20 @@
+name = "asa-directory-editor"
+main = "worker.js"
+compatibility_date = "2025-11-21"
+workers_dev = true
+
+# Ha majd fix domaint akarsz:
+# routes = [
+#   { pattern = "asa-harmonizer.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+[vars]
+GITHUB_OWNER = "kbence2000"
+GITHUB_REPO = "ASA_FULL"
+BASE_BRANCH = "main"
+
+# Opcionális default utak – ezeket csak meta infónak használjuk a PR-ban
+DEFAULT_PATHS = "apps/**,packages/**"
+
+[observability]
+enabled = true
