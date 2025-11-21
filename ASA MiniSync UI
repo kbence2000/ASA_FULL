@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ASA MultiSync UI</title>
+
+<style>
+  :root {
+    --bg: #000000;
+    --panel: rgba(12, 12, 12, 0.75);
+    --glass: rgba(20, 20, 20, 0.55);
+    --accent1: #00ffd2;
+    --accent2: #00aaff;
+    --text: #e6e6e6;
+    --error: #ff4d4d;
+    --success: #2aff6c;
+    --radius: 14px;
+    --blur: 18px;
+    --border: rgba(255,255,255,0.12);
+    font-family: "Inter", system-ui, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .wrapper {
+    max-width: 780px;
+    margin: auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .card {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    backdrop-filter: blur(var(--blur));
+    box-shadow: 0 0 25px rgba(0, 255, 200, 0.12);
+    animation: fadein 0.5s;
+  }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    background: linear-gradient(90deg, var(--accent1), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  input[type=password] {
+    width: 100%;
+    padding: 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: #050505;
+    color: var(--text);
+    font-size: 15px;
+    margin-bottom: 12px;
+  }
+
+  button {
+    width: 100%;
+    padding: 14px;
+    border-radius: var(--radius);
+    border: none;
+    background: linear-gradient(90deg, var(--accent1), var(--accent2));
+    color: #000;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.25s ease;
+  }
+  button:hover {
+    filter: brightness(1.25);
+  }
+
+  .sync-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media(max-width: 600px){
+    .sync-grid { grid-template-columns: 1fr; }
+  }
+
+  .logbox {
+    height: 240px;
+    overflow-y: auto;
+    background: #050505;
+    border-radius: var(--radius);
+    padding: 14px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    white-space: pre-wrap;
+  }
+
+  .status {
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+
+<body>
+<div class="wrapper">
+  
+  <h1>ASA MultiSync Dashboard</h1>
+
+  <!-- LOGIN PANEL -->
+  <div class="card" id="loginPanel">
+    <h2>Login</h2>
+    <input id="passwordInput" type="password" placeholder="Master Admin Password" />
+    <button onclick="login()">Login</button>
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="card" id="mainPanel" style="display:none;">
+    <h2>Sync Controls</h2>
+
+    <div class="status" id="statusBox">Status: Waiting…</div>
+
+    <div class="sync-grid">
+      <button onclick="syncGithubToBase44()">GitHub → Base44 Sync</button>
+      <button onclick="syncBase44ToGithub()">Base44 → GitHub Sync</button>
+      <button onclick="syncFull()" style="grid-column: 1 / -1; background: #2aff6c; color:#000;">
+        FULL SYNC PIPELINE
+      </button>
+    </div>
+  </div>
+
+  <!-- LOG PANEL -->
+  <div class="card" id="logPanel" style="display:none;">
+    <h2>Live Log</h2>
+    <div class="logbox" id="logBox"></div>
+  </div>
+
+</div>
+
+<script>
+  const API_BASE = "/";   // ugyanabba a domainbe deployolva → rooton elérhető
+
+  function log(msg) {
+    const el = document.getElementById("logBox");
+    el.textContent += msg + "\n";
+    el.scrollTop = el.scrollHeight;
+  }
+
+  async function api(path, method="GET", body=null){
+    const headers = { "Content-Type": "application/json" };
+    const res = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : null,
+      credentials: "include"
+    });
+    const txt = await res.text();
+    try { return JSON.parse(txt); }
+    catch { return txt; }
+  }
+
+  async function login(){
+    const pwd = document.getElementById("passwordInput").value;
+    log("Attempting login…");
+
+    const r = await api("login", "POST", { password: pwd });
+
+    if(r.error){
+      log("❌ Login failed: " + r.error);
+      document.getElementById("statusBox").textContent = "Status: Auth failed";
+      return;
+    }
+    log("✅ Login successful!");
+    document.getElementById("loginPanel").style.display="none";
+    document.getElementById("mainPanel").style.display="block";
+    document.getElementById("logPanel").style.display="block";
+    document.getElementById("statusBox").textContent = "Status: Logged in";
+  }
+
+  async function syncGithubToBase44(){
+    log("🔄 Running GitHub → Base44 sync…");
+    document.getElementById("statusBox").textContent = "Status: GitHub → Base44 syncing…";
+    const r = await api("sync/github-to-base44", "POST");
+    log(JSON.stringify(r, null, 2));
+    document.getElementById("statusBox").textContent = "Status: Done (GitHub → Base44)";
+  }
+
+  async function syncBase44ToGithub(){
+    log("🔄 Running Base44 → GitHub sync…");
+    document.getElementById("statusBox").textContent = "Status: Base44 → GitHub syncing…";
+    const r = await api("sync/base44-to-github", "POST");
+    log(JSON.stringify(r, null, 2));
+    document.getElementById("statusBox").textContent = "Status: Done (Base44 → GitHub)";
+  }
+
+  async function syncFull(){
+    log("🚀 Running FULL pipeline…");
+    document.getElementById("statusBox").textContent = "Status: Full sync running…";
+    const r = await api("sync/full", "POST");
+    log(JSON.stringify(r, null, 2));
+    document.getElementById("statusBox").textContent = "Status: DONE (FULL SYNC)";
+  }
+</script>
+
+</body>
+</html>
