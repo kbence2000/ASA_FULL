@@ -1,0 +1,347 @@
+// =========================
+// src/index.ts
+// ASA Aurora Multi-Sync Engine v1
+// =========================
+
+export interface Env {
+  ASA_STATE: KVNamespace;
+  GITHUB_OWNER: string;
+  GITHUB_REPO: string;
+  BASE44_API_URL: string;
+  OPENAI_API_BASE: string;
+  OPENAI_MODEL: string;
+
+  // Secrets (Cloudflare Dashboard → Workers → Settings → Secrets)
+  GITHUB_TOKEN: string;
+  BASE44_API_KEY: string;
+  OPENAI_API_KEY: string;
+}
+
+type LogEntry = {
+  ts: string;
+  level: "info" | "warn" | "error";
+  msg: string;
+};
+
+const LOG_KEY = "asa:logs";
+const LAST_SHA_KEY = "asa:last_sha";
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // CORS simple handling
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders(),
+      });
+    }
+
+    // Web UI static fallback (ha Pages-szel szolgálsz ki, ezt átveheti a Pages)
+    if (url.pathname === "/" && request.method === "GET") {
+      return new Response(
+        "ASA Aurora Multi-Sync Worker backend is running.\nServe the UI via Cloudflare Pages / static hosting.",
+        { headers: { "content-type": "text/plain; charset=utf-8" } },
+      );
+    }
+
+    // --- WebSocket realtime log stream ---
+    if (url.pathname === "/logs" && request.method === "GET") {
+      const pair = new WebSocketPair();
+      const client = pair[0];
+      const server = pair[1];
+
+      handleLogSocket(server, env, ctx);
+      return new Response(null, {
+        status: 101,
+        webSocket: client,
+      });
+    }
+
+    // --- API: trigger multi-sync ---
+    if (url.pathname === "/api/sync" && request.method === "POST") {
+      return runSync(request, env, ctx);
+    }
+
+    // --- API: közel valós idejű log poll (fallback, ha WS nem megy) ---
+    if (url.pathname === "/api/logs" && request.method === "GET") {
+      const logsJson = (await env.ASA_STATE.get(LOG_KEY)) ?? "[]";
+      return jsonResponse(JSON.parse(logsJson));
+    }
+
+    return new Response("Not found", { status: 404, headers: corsHeaders() });
+  },
+};
+
+// =========================
+// Helpers
+// =========================
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+  };
+}
+
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data, null, 2), {
+    status,
+    headers: {
+      ...corsHeaders(),
+      "content-type": "application/json; charset=utf-8",
+    },
+  });
+}
+
+async function appendLog(env: Env, entry: LogEntry) {
+  const existing = (await env.ASA_STATE.get(LOG_KEY)) || "[]";
+  const arr: LogEntry[] = JSON.parse(existing);
+  arr.push(entry);
+  // limit log size
+  const trimmed = arr.slice(-200);
+  await env.ASA_STATE.put(LOG_KEY, JSON.stringify(trimmed));
+}
+
+async function handleLogSocket(ws: WebSocket, env: Env, ctx: ExecutionContext) {
+  ws.accept();
+
+  // egyszerű: connectkor kiküldjük az utolsó logokat, + heartbeat
+  ctx.waitUntil(
+    (async () => {
+      const logsJson = (await env.ASA_STATE.get(LOG_KEY)) ?? "[]";
+      ws.send(
+        JSON.stringify({
+          type: "init",
+          logs: JSON.parse(logsJson),
+        }),
+      );
+
+      // 3x heartbeat demo (Cloudflare-en nem szeretjük a végtelen intervalt)
+      for (let i = 0; i < 3; i++) {
+        await new Promise((r) => setTimeout(r, 5000));
+        ws.send(
+          JSON.stringify({
+            type: "heartbeat",
+            at: new Date().toISOString(),
+          }),
+        );
+      }
+
+      ws.close(1000, "log stream demo end");
+    })(),
+  );
+
+  ws.addEventListener("message", (ev) => {
+    // ha a kliens küld valamit, echo-zzuk vissza
+    ws.send(
+      JSON.stringify({
+        type: "echo",
+        payload: ev.data,
+      }),
+    );
+  });
+}
+
+// =========================
+// Main sync flow
+// =========================
+
+async function runSync(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const body = await request.json().catch(() => ({}));
+  const mode = body.mode ?? "full";
+
+  const startedAt = new Date().toISOString();
+  await appendLog(env, { ts: startedAt, level: "info", msg: `Sync started (mode=${mode})` });
+
+  // 1) Get latest GitHub commit SHA
+  const repoFull = `${env.GITHUB_OWNER}/${env.GITHUB_REPO}`;
+  const ghLatest = await githubGetLatestCommit(env, repoFull);
+  if (!ghLatest) {
+    await appendLog(env, { ts: new Date().toISOString(), level: "error", msg: "GitHub latest commit fetch failed." });
+    return jsonResponse({ error: "GitHub fetch failed" }, 500);
+  }
+
+  const latestSha = ghLatest.sha;
+  await appendLog(env, { ts: new Date().toISOString(), level: "info", msg: `GitHub latest SHA: ${latestSha}` });
+
+  const lastSha = (await env.ASA_STATE.get(LAST_SHA_KEY)) || null;
+
+  // 2) If lastSha exists, fetch diff & send to OpenAI
+  let aiSummary: string | null = null;
+  if (lastSha && lastSha !== latestSha) {
+    await appendLog(env, {
+      ts: new Date().toISOString(),
+      level: "info",
+      msg: `Diff from ${lastSha} → ${latestSha}`,
+    });
+
+    const diffText = await githubGetDiff(env, repoFull, lastSha, latestSha);
+    if (diffText) {
+      aiSummary = await openAiSummarizeDiff(env, diffText);
+      await appendLog(env, {
+        ts: new Date().toISOString(),
+        level: "info",
+        msg: `OpenAI diff summary generated.`,
+      });
+    }
+  } else if (!lastSha) {
+    await appendLog(env, {
+      ts: new Date().toISOString(),
+      level: "info",
+      msg: "No previous SHA – initial sync.",
+    });
+  } else {
+    await appendLog(env, {
+      ts: new Date().toISOString(),
+      level: "info",
+      msg: "No new commits since last sync.",
+    });
+  }
+
+  // 3) Call Base44 sync API (placeholder – alakítsd a saját endpointodra)
+  const base44Result = await base44Sync(env, {
+    repo: repoFull,
+    latestSha,
+    aiSummary,
+  });
+
+  await appendLog(env, {
+    ts: new Date().toISOString(),
+    level: base44Result.ok ? "info" : "error",
+    msg: `Base44 sync result: ${base44Result.ok ? "OK" : "FAIL"}`,
+  });
+
+  // 4) Persist latestSha
+  await env.ASA_STATE.put(LAST_SHA_KEY, latestSha);
+
+  const finishedAt = new Date().toISOString();
+  await appendLog(env, { ts: finishedAt, level: "info", msg: "Sync finished." });
+
+  return jsonResponse({
+    status: "ok",
+    mode,
+    repo: repoFull,
+    latestSha,
+    lastSha,
+    aiSummary,
+    base44: base44Result,
+    startedAt,
+    finishedAt,
+  });
+}
+
+// =========================
+// GitHub helpers
+// =========================
+
+async function githubGetLatestCommit(env: Env, repoFull: string): Promise<{ sha: string } | null> {
+  const res = await fetch(`https://api.github.com/repos/${repoFull}/commits?per_page=1`, {
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      "User-Agent": "asa-aurora-multisync",
+      Accept: "application/vnd.github+json",
+    },
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  if (!Array.isArray(json) || !json[0]?.sha) return null;
+  return { sha: json[0].sha };
+}
+
+async function githubGetDiff(env: Env, repoFull: string, fromSha: string, toSha: string): Promise<string | null> {
+  const res = await fetch(
+    `https://api.github.com/repos/${repoFull}/compare/${fromSha}...${toSha}`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        "User-Agent": "asa-aurora-multisync",
+        Accept: "application/vnd.github+json",
+      },
+    },
+  );
+  if (!res.ok) return null;
+  const json: any = await res.json();
+  // egyszerűsítve: csak a patch-eket fűzzük össze
+  if (!Array.isArray(json.files)) return null;
+  const patches = json.files
+    .map((f: any) => `File: ${f.filename}\n${f.patch ?? ""}`)
+    .join("\n\n");
+  return patches;
+}
+
+// =========================
+// OpenAI diff analysis
+// =========================
+
+async function openAiSummarizeDiff(env: Env, diffText: string): Promise<string | null> {
+  // Truncate diff hogy ne legyen túl nagy
+  const maxChars = 8000;
+  const truncated = diffText.length > maxChars ? diffText.slice(0, maxChars) + "\n...[truncated]" : diffText;
+
+  const payload = {
+    model: env.OPENAI_MODEL,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are an elite AI DevOps assistant (ASA Aurora). Summarize code diffs for a multi-sync CI/CD engine. " +
+          "Highlight risk, breaking changes, migrations, and deployment notes in bullet points.",
+      },
+      {
+        role: "user",
+        content: truncated,
+      },
+    ],
+    temperature: 0.1,
+  };
+
+  const res = await fetch(`${env.OPENAI_API_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) return null;
+  const json: any = await res.json();
+  const content = json.choices?.[0]?.message?.content;
+  if (!content) return null;
+  return String(content);
+}
+
+// =========================
+// Base44 API bridge (placeholder)
+// =========================
+
+async function base44Sync(
+  env: Env,
+  payload: { repo: string; latestSha: string; aiSummary: string | null },
+): Promise<{ ok: boolean; status: number; body?: any }> {
+  try {
+    const res = await fetch(`${env.BASE44_API_URL}/sync`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${env.BASE44_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text().catch(() => "");
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { raw: text };
+    }
+
+    return { ok: res.ok, status: res.status, body: parsed };
+  } catch (e: any) {
+    return { ok: false, status: 0, body: { error: String(e?.message || e) } };
+  }
+}
