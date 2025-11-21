@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ASA AAAN – Agent Monitoring System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+  :root {
+    --bg: #000408;
+    --card: #040b16;
+    --border: rgba(0,255,200,0.18);
+    --accent1: #16ffe0;
+    --accent2: #00b3ff;
+    --text: #e2e8f0;
+    --text-muted: #6b7280;
+    --danger: #ff3b69;
+    --warn: #facc15;
+    --success: #22c55e;
+    --radius: 18px;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  body {
+    background: radial-gradient(circle at 20% 0%, #001122, #000000 55%);
+    color: var(--text);
+    font-family: "Inter", sans-serif;
+    overflow-x:hidden;
+  }
+
+  /* Aurora bg */
+  .aurora {
+    position: fixed;
+    inset: -25%;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(22,255,224,0.25), transparent 60%),
+      radial-gradient(circle at 80% 10%, rgba(0,179,255,0.25), transparent 60%),
+      radial-gradient(circle at 20% 80%, rgba(22,255,224,0.20), transparent 70%),
+      radial-gradient(circle at 85% 75%, rgba(0,179,255,0.25), transparent 65%);
+    filter: blur(18px);
+    animation: aurora 25s ease-in-out infinite alternate;
+    z-index: -2;
+  }
+  @keyframes aurora {
+    from{transform:translate(-20px,20px) scale(1);}
+    to{transform:translate(20px,-20px) scale(1.04);}
+  }
+
+  .header {
+    padding: 24px 30px 10px;
+  }
+  .title {
+    font-size: 1.8rem;
+    font-weight:800;
+    margin-bottom:6px;
+    background: linear-gradient(90deg,var(--accent1),var(--accent2));
+    -webkit-background-clip:text;
+    color:transparent;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    letter-spacing:0.1em;
+  }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 1.9fr 1.1fr;
+    gap: 20px;
+    padding: 20px 26px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 18px;
+    border-radius: var(--radius);
+    box-shadow: 0 0 30px rgba(0,255,200,0.07);
+  }
+
+  .section-title {
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  /* Agent frakciók */
+  .faction-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill,minmax(130px,1fr));
+    gap: 14px;
+  }
+
+  .faction {
+    background: rgba(22,255,224,0.06);
+    border: 1px solid rgba(22,255,224,0.2);
+    padding: 14px;
+    border-radius: 16px;
+    text-align:center;
+    transition:0.2s ease;
+    cursor:pointer;
+  }
+  .faction:hover{
+    background: rgba(22,255,224,0.13);
+    transform: translateY(-3px);
+  }
+
+  .f-icon {
+    font-size:1.6rem;
+    margin-bottom:8px;
+    text-shadow:0 0 15px rgba(22,255,224,0.8);
+  }
+  .f-name {
+    font-size:0.88rem;
+    letter-spacing:0.06em;
+  }
+
+  /* Agent table */
+  .table {
+    width:100%;
+    border-collapse:collapse;
+  }
+  .table th, .table td {
+    padding: 8px 6px;
+    font-size:0.85rem;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+  }
+  .table th {
+    text-align:left;
+    color:var(--text-muted);
+    text-transform:uppercase;
+    font-size:0.72rem;
+    letter-spacing:0.1em;
+  }
+
+  .pill {
+    padding: 2px 8px;
+    border-radius:12px;
+    font-size:0.70rem;
+    color:#000;
+  }
+  .good {background:var(--success);}
+  .warn {background:var(--warn);}
+  .bad {background:var(--danger);}
+
+  /* Mission launch */
+  .launch-btn {
+    background: linear-gradient(135deg,var(--accent1),var(--accent2));
+    border:none;
+    padding: 10px 18px;
+    border-radius:20px;
+    cursor:pointer;
+    font-size:0.85rem;
+    font-weight:600;
+    color:#01060f;
+    box-shadow:0 0 18px rgba(22,255,224,0.7);
+    margin-top:10px;
+    transition:0.18s;
+  }
+  .launch-btn:hover {
+    transform: scale(1.06);
+  }
+
+  /* Swarm Renderer */
+  #swarm {
+    width:100%;
+    height:360px;
+    background:#000812;
+    border-radius:var(--radius);
+    position:relative;
+    overflow:hidden;
+    border:1px solid rgba(22,255,224,0.2);
+  }
+  .node {
+    width:8px;
+    height:8px;
+    background:var(--accent1);
+    border-radius:50%;
+    position:absolute;
+    box-shadow:0 0 6px rgba(22,255,224,0.9);
+    opacity:0.9;
+    transition: transform 0.8s ease-out;
+  }
+
+</style>
+</head>
+
+<body>
+
+<div class="aurora"></div>
+
+<div class="header">
+  <div class="title">ASA AAAN – Agent Monitoring System</div>
+  <div class="subtitle">Agent frakciók • Skill-tree • Mission klón seregek • Swarm topológia</div>
+</div>
+
+<div class="layout">
+
+  <!-- Agent FRACTIONS -->
+  <div class="card">
+    <div class="section-title">Agent Frakciók</div>
+
+    <div class="faction-grid" id="factions">
+      <!-- JS tölti fel -->
+    </div>
+
+    <button class="launch-btn" id="spawn">🚀 Indíts új Agent Klónt</button>
+  </div>
+
+  <!-- ACTIVE AGENTS TABLE -->
+  <div class="card">
+    <div class="section-title">Aktív Agent Klónok</div>
+    <table class="table" id="agent-table">
+      <thead>
+        <tr>
+          <th>Név</th>
+          <th>Frakció</th>
+          <th>Skill</th>
+          <th>Állapot</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Swarm view -->
+<div class="layout" style="grid-template-columns:1fr;">
+  <div class="card">
+    <div class="section-title">Swarm Topológia</div>
+    <div id="swarm"></div>
+  </div>
+</div>
+
+<script>
+/* === FRAKCIÓ DEFINÍCIÓ === */
+const FRACTIONS = [
+  { name:"OPS", icon:"🛠️", skills:["LatencyFix","PipelineTune","AutoPatch"] },
+  { name:"SYNC", icon:"🔄", skills:["RepoSync","Base44Sync","MeshAlign"] },
+  { name:"INTEL", icon:"🧠", skills:["AnomalyDetect","Forecast","AIReason"] },
+  { name:"DEFENSE", icon:"🛡️", skills:["RateShield","FailoverPrep","AutoRecover"] },
+  { name:"BUILDER", icon:"🏗️", skills:["ModuleGen","Refactor","AutoDeploy"] },
+  { name:"FIXER", icon:"🔧", skills:["ErrorFix","HotPatch","Rollback"] }
+];
+
+/* === RENDER FRACTIONS === */
+const factionWrap = document.getElementById("factions");
+
+FRACTIONS.forEach(f=>{
+  const d=document.createElement("div");
+  d.className="faction";
+  d.innerHTML=`
+    <div class="f-icon">${f.icon}</div>
+    <div class="f-name">${f.name}</div>
+  `;
+  d.onclick=()=>selectFaction(f);
+  factionWrap.appendChild(d);
+});
+
+let SELECTED = FRACTIONS[0];
+
+/* === AGENT TABLE === */
+const tableBody = document.querySelector("#agent-table tbody");
+
+function addAgentClone(name, fraction, skill) {
+  const row = document.createElement("tr");
+  const status = ["good","warn","bad"][Math.floor(Math.random()*3)];
+  row.innerHTML=`
+    <td>${name}</td>
+    <td>${fraction}</td>
+    <td>${skill}</td>
+    <td><span class="pill ${status}">${status==="good"?"OK":status==="warn"?"FIGYEL":"HIBA"}</span></td>
+  `;
+  tableBody.appendChild(row);
+  pushToSwarm();
+}
+
+/* === SPAWN button === */
+document.getElementById("spawn").onclick = ()=>{
+  const f = SELECTED;
+  const skill = f.skills[Math.floor(Math.random()*f.skills.length)];
+  const agentName = f.name+"-A"+Math.floor(Math.random()*999);
+  addAgentClone(agentName, f.name, skill);
+};
+
+/* === FRACTION SELECT === */
+function selectFaction(f){
+  SELECTED = f;
+}
+
+/* === SWARM RENDERER === */
+const swarm = document.getElementById("swarm");
+
+function pushToSwarm(){
+  const node = document.createElement("div");
+  node.className="node";
+  node.style.left = Math.random()*90+"%";
+  node.style.top = Math.random()*90+"%";
+  swarm.appendChild(node);
+
+  // animate random movement
+  setInterval(()=>{
+    node.style.transform=`translate(${(Math.random()*50)-25}px, ${(Math.random()*50)-25}px)`;
+  },1500);
+}
+
+// random initial swarm
+for(let i=0;i<18;i++) pushToSwarm();
+
+</script>
+</body>
+</html>
