@@ -1,24 +1,16 @@
-# =========================
-# wrangler.toml
-# =========================
-name = "asa-aurora-multisync"
-main = "src/index.ts"
-compatibility_date = "2025-11-21"
+name = "asa-directory-editor"
+main = "src/asa-code-harmonizer-worker.js"
+compatibility_date = "2024-11-21"
 
-# --- KV binding az állapotnak (utolsó SHA, logok stb.) ---
-[[kv_namespaces]]
-binding = "ASA_STATE"
-id = "REPLACE_WITH_YOUR_KV_ID"
+[build]
+command = "npm install"
+watch_dir = "src"
+upload_format = "modules"
 
-# --- Env változók (Cloudflare dashboardon állítod) ---
 [vars]
 GITHUB_OWNER = "kbence2000"
-GITHUB_REPO  = "asadesignv1"
-BASE44_API_URL = "https://your-base44-api-url.example.com"
-OPENAI_API_BASE = "https://api.openai.com/v1"
-OPENAI_MODEL = "gpt-4.1" # vagy amit akarsz
-# (OPENAI_API_KEY, GITHUB_TOKEN, BASE44_API_KEY: Secrets-ben!)
-
-# Ha Pages-en futtatod:
-[observability]
-enabled = true
+GITHUB_REPO = "asa_full"
+BASE_BRANCH = "main"
+DEFAULT_PATHS = "apps/backend,apps/dashboard"
+OPENAI_API_KEY = "YOUR_OPENAI_KEY"
+GITHUB_TOKEN = "YOUR_GITHUB_PAT"
