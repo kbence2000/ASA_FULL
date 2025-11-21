@@ -1,0 +1,17 @@
+// === REFINED BASE44 SYNC ===
+async function base44RefinedSync(env: Env, sourceZip: ArrayBuffer) {
+  const res = await fetch(`${env.BASE44_API_URL}/import`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.BASE44_API_KEY}`,
+      "content-type": "application/octet-stream",
+    },
+    body: sourceZip,  // teljes ZIP mehet
+  });
+
+  const text = await res.text().catch(() => "");
+  let parsed: any = null;
+  try { parsed = JSON.parse(text); } catch (_) { parsed = { raw: text }; }
+
+  return { ok: res.ok, status: res.status, body: parsed };
+}
