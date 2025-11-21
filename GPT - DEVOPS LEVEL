@@ -1,0 +1,38 @@
+async function openAiDiffRefined(env: Env, diffText: string): Promise<string | null> {
+  const prompt = `
+You are ASA Aurora GPT.
+You analyze code diffs for a Multi-Sync CI/CD engine.
+
+Return a structured JSON with:
+- "risk"
+- "impact"
+- "deployment_notes"
+- "recommended_actions"
+- "complexity_score" (0-100)
+- "stability_score" (0-100)
+
+Input diff:
+${diffText}
+`;
+
+  const res = await fetch(`${env.OPENAI_API_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: env.OPENAI_MODEL,
+      messages: [
+        { role: "system", content: "You are ASA Aurora DevOps Analyzer v2." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.1,
+    }),
+  });
+
+  if (!res.ok) return null;
+
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content ?? null;
+}
