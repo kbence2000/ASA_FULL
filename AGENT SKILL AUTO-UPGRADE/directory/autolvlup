@@ -1,0 +1,19 @@
+<script>
+/* ====================================
+   ASA AGENT MATRIX - Auto Skill Upgrade
+   ==================================== */
+
+function applySkillMutation(){
+  agents.forEach(agent=>{
+    const factor = (Math.random()*2 - 1); // -1 és +1 között
+    const mutation = [
+      "recon","ops","tactics","engineering"
+    ];
+
+    const chosen = mutation[Math.floor(Math.random()*mutation.length)];
+    agent.skills[chosen] = Math.min(100, Math.max(40, agent.skills[chosen] + factor));
+  });
+}
+
+setInterval(applySkillMutation, 6000); // folyamatos önfejlesztés
+</script>
