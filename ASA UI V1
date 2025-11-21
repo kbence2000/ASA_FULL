@@ -1,1 +1,836 @@
-index.html
+<!-- =========================
+public/index.html
+ASA Aurora UI – vortex háttér + ASA Core hologram + WS log stream
+========================= -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ASA Aurora Multi-Sync Engine</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      :root {
+        --bg-main: #020204; /* triple black */
+        --accent-1: #00f5ff; /* cián-kék-zöld */
+        --accent-2: #00cba9; /* sötét türkiz */
+        --accent-3: #7b61ff; /* ASA lila highlight */
+        --text-main: #f5f5f7;
+        --text-muted: #8a8fa3;
+        --card-bg: rgba(4, 8, 16, 0.9);
+        --border-subtle: rgba(120, 255, 220, 0.2);
+        --shadow-soft: 0 0 40px rgba(0, 255, 200, 0.25);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+        background: radial-gradient(circle at top, #050816 0%, #020204 60%, #000000 100%);
+        color: var(--text-main);
+      }
+
+      body {
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+      }
+
+      #aurora-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+      }
+
+      .glow-overlay {
+        pointer-events: none;
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(circle at 10% 10%, rgba(0, 245, 255, 0.14), transparent 55%),
+          radial-gradient(circle at 90% 80%, rgba(0, 203, 169, 0.16), transparent 55%);
+        mix-blend-mode: screen;
+        opacity: 0.9;
+      }
+
+      .layout {
+        position: relative;
+        width: min(1200px, 100%);
+        height: 100%;
+        padding: 18px 16px 20px;
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        grid-template-rows: auto 1fr auto;
+        gap: 14px;
+      }
+
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto minmax(0, 1fr) auto;
+          padding: 14px 10px 16px;
+        }
+      }
+
+      .top-bar {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        backdrop-filter: blur(14px);
+        background: linear-gradient(
+          120deg,
+          rgba(2, 4, 12, 0.9),
+          rgba(4, 12, 20, 0.92),
+          rgba(5, 16, 24, 0.9)
+        );
+        border-radius: 16px;
+        border: 1px solid rgba(0, 255, 220, 0.18);
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), var(--shadow-soft);
+        padding: 10px 16px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .brand-logo {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        background: radial-gradient(circle at 30% 0%, #ffffff, #00f5ff, #00cba9 65%, transparent 100%);
+        box-shadow:
+          0 0 28px rgba(0, 245, 255, 0.7),
+          0 0 12px rgba(0, 203, 169, 0.7);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .brand-logo::after {
+        content: "";
+        position: absolute;
+        inset: 25%;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+      }
+
+      .brand-text-main {
+        font-size: 14px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .brand-text-sub {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        color: rgba(155, 182, 210, 0.9);
+      }
+
+      .chip-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .chip {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.17em;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 245, 255, 0.34);
+        color: rgba(214, 244, 255, 0.9);
+        background: radial-gradient(circle at 0 0, rgba(0, 245, 255, 0.2), transparent 65%);
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: radial-gradient(circle, #00ffcc, #00b894, #00695c);
+        box-shadow: 0 0 10px rgba(0, 255, 200, 0.9);
+      }
+
+      .hologram-card {
+        grid-row: 2 / span 2;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border-radius: 18px;
+        background: radial-gradient(circle at 10% 0%, rgba(0, 245, 255, 0.22), transparent 55%),
+          radial-gradient(circle at 90% 100%, rgba(0, 203, 169, 0.25), transparent 60%),
+          var(--card-bg);
+        border: 1px solid var(--border-subtle);
+        box-shadow: 0 0 60px rgba(0, 245, 255, 0.25);
+        padding: 18px 18px 14px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      @media (max-width: 900px) {
+        .hologram-card {
+          grid-row: auto;
+          min-height: 260px;
+        }
+      }
+
+      .hologram-inner {
+        position: relative;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .hologram-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .hologram-title {
+        font-size: 13px;
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        color: rgba(197, 226, 255, 0.95);
+      }
+
+      .hologram-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .hologram-core {
+        position: relative;
+        margin-top: 6px;
+        flex: 1;
+        border-radius: 16px;
+        border: 1px solid rgba(0, 245, 255, 0.2);
+        background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.06), transparent 60%),
+          linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(2, 12, 16, 0.9));
+        overflow: hidden;
+      }
+
+      .core-grid {
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(
+            rgba(0, 255, 204, 0.09) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            90deg,
+            rgba(0, 255, 204, 0.1) 1px,
+            transparent 1px
+          );
+        background-size: 28px 28px, 28px 28px;
+        opacity: 0.45;
+        transform-origin: center;
+        animation: grid-pan 22s linear infinite;
+      }
+
+      @keyframes grid-pan {
+        0% {
+          transform: translate3d(0, 0, 0) rotate(0.8deg);
+        }
+        100% {
+          transform: translate3d(-28px, -28px, 0) rotate(0.8deg);
+        }
+      }
+
+      .core-orbit {
+        position: absolute;
+        inset: 18%;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 245, 255, 0.4);
+        box-shadow:
+          0 0 24px rgba(0, 245, 255, 0.32),
+          inset 0 0 18px rgba(0, 0, 0, 0.7);
+        filter: drop-shadow(0 0 32px rgba(0, 255, 220, 0.4));
+      }
+
+      .core-orbit::before {
+        content: "";
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        background: radial-gradient(circle at 30% 0%, #ffffff, #00f5ff 60%, #00cba9);
+        box-shadow: 0 0 16px rgba(0, 255, 200, 0.9);
+        top: 50%;
+        left: 100%;
+        transform: translate(-50%, -50%);
+        animation: orbit-dot 8s linear infinite;
+        transform-origin: -90px center;
+      }
+
+      @keyframes orbit-dot {
+        0% {
+          transform: rotate(0deg) translate(-50%, -50%);
+        }
+        100% {
+          transform: rotate(360deg) translate(-50%, -50%);
+        }
+      }
+
+      .core-pulse {
+        position: absolute;
+        inset: 40%;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(0, 245, 255, 0.7), transparent 70%);
+        opacity: 0.4;
+        animation: core-pulse 2.4s ease-in-out infinite;
+      }
+
+      @keyframes core-pulse {
+        0% {
+          transform: scale(0.8);
+          opacity: 0.3;
+        }
+        50% {
+          transform: scale(1);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(0.8);
+          opacity: 0.3;
+        }
+      }
+
+      .core-center-label {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: rgba(222, 248, 255, 0.85);
+        text-shadow: 0 0 14px rgba(0, 255, 220, 0.7);
+      }
+
+      .core-metrics {
+        position: absolute;
+        left: 14px;
+        bottom: 10px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .metric-pill {
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 50px;
+        border: 1px solid rgba(0, 245, 255, 0.32);
+        color: rgba(208, 239, 255, 0.95);
+        background: linear-gradient(
+          135deg,
+          rgba(0, 245, 255, 0.08),
+          rgba(0, 203, 169, 0.06)
+        );
+      }
+
+      .sync-panel {
+        grid-row: 2 / span 1;
+        border-radius: 16px;
+        background: radial-gradient(circle at 0 0, rgba(0, 245, 255, 0.1), transparent 60%),
+          radial-gradient(circle at 100% 100%, rgba(0, 203, 169, 0.1), transparent 60%),
+          rgba(2, 4, 12, 0.95);
+        border: 1px solid rgba(0, 245, 255, 0.26);
+        padding: 14px 14px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .sync-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .sync-title {
+        font-size: 12px;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: rgba(210, 235, 255, 0.92);
+      }
+
+      .sync-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .sync-controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+
+      .sync-select,
+      .sync-button {
+        border-radius: 999px;
+        border: 1px solid rgba(0, 245, 255, 0.5);
+        background: rgba(0, 5, 10, 0.8);
+        color: var(--text-main);
+        padding: 6px 12px;
+        font-size: 12px;
+        font-family: inherit;
+      }
+
+      .sync-select {
+        padding-right: 24px;
+      }
+
+      .sync-button {
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .sync-button span {
+        font-size: 14px;
+      }
+
+      .sync-button:hover {
+        background: linear-gradient(135deg, rgba(0, 245, 255, 0.18), rgba(0, 203, 169, 0.12));
+        box-shadow: 0 0 18px rgba(0, 255, 220, 0.35);
+      }
+
+      .sync-status-line {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .log-panel {
+        grid-row: 3 / span 1;
+        border-radius: 16px;
+        background: rgba(2, 4, 8, 0.92);
+        border: 1px solid rgba(0, 245, 255, 0.24);
+        padding: 10px 12px 10px;
+        display: flex;
+        flex-direction: column;
+        min-height: 140px;
+        max-height: 240px;
+      }
+
+      .log-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+      }
+
+      .log-title {
+        font-size: 11px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgba(175, 208, 239, 0.98);
+      }
+
+      .log-badge {
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(0, 245, 255, 0.1);
+        border: 1px solid rgba(0, 245, 255, 0.3);
+        color: rgba(199, 232, 255, 0.9);
+      }
+
+      .log-stream {
+        flex: 1;
+        margin-top: 4px;
+        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+          "Courier New", monospace;
+        font-size: 11px;
+        line-height: 1.4;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .log-line {
+        white-space: pre;
+        color: rgba(217, 237, 255, 0.96);
+      }
+
+      .log-line.info {
+        color: rgba(167, 227, 255, 0.96);
+      }
+
+      .log-line.warn {
+        color: #ffdd7a;
+      }
+
+      .log-line.error {
+        color: #ff8b8b;
+      }
+
+      .log-line span.ts {
+        color: rgba(127, 173, 214, 0.8);
+        margin-right: 4px;
+      }
+
+      .log-line span.tag {
+        margin-right: 4px;
+      }
+
+      .footer {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 10px;
+        color: var(--text-muted);
+        opacity: 0.85;
+      }
+
+      .footer span strong {
+        color: var(--accent-1);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="aurora-canvas"></canvas>
+    <div class="glow-overlay"></div>
+
+    <main class="layout">
+      <header class="top-bar">
+        <div class="brand">
+          <div class="brand-logo"></div>
+          <div>
+            <div class="brand-text-main">ASA AURORA</div>
+            <div class="brand-text-sub">MULTI-SYNC ENGINE · LAYER 2</div>
+          </div>
+        </div>
+        <div class="chip-row">
+          <div class="status-dot"></div>
+          <div class="chip">Realtime · CF Worker · GitHub · Base44 · GPT</div>
+        </div>
+      </header>
+
+      <section class="hologram-card">
+        <div class="hologram-inner">
+          <div class="hologram-header">
+            <div>
+              <div class="hologram-title">ASA CORE HOLOGRAM</div>
+              <div class="hologram-sub">GitHub & Base44 & GPT-ops · Sync Telemetry</div>
+            </div>
+          </div>
+          <div class="hologram-core">
+            <div class="core-grid"></div>
+            <div class="core-orbit"></div>
+            <div class="core-pulse"></div>
+            <div class="core-center-label">AURORA CORE</div>
+            <div class="core-metrics">
+              <div class="metric-pill" id="metric-sync-state">SYNC · IDLE</div>
+              <div class="metric-pill" id="metric-last-sha">SHA · –</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sync-panel">
+        <div class="sync-header-row">
+          <div>
+            <div class="sync-title">MULTI-SYNC CONTROL</div>
+            <div class="sync-sub">GitHub → Base44 bridge · GPT-diff inspector</div>
+          </div>
+        </div>
+
+        <div class="sync-controls">
+          <select id="sync-mode" class="sync-select">
+            <option value="full">Full sync (GitHub → Base44)</option>
+            <option value="github">Only GitHub status</option>
+            <option value="base44">Only Base44 push</option>
+          </select>
+
+          <button id="sync-btn" class="sync-button">
+            <span>⟳</span>
+            <span>Run Sync</span>
+          </button>
+        </div>
+
+        <div class="sync-status-line" id="sync-status">
+          Waiting for command…
+        </div>
+      </section>
+
+      <section class="log-panel">
+        <div class="log-header">
+          <div class="log-title">REALTIME LOG STREAM</div>
+          <div class="log-badge" id="ws-status">WS · DISCONNECTED</div>
+        </div>
+        <div id="log-stream" class="log-stream"></div>
+      </section>
+
+      <footer class="footer">
+        <span>ASA Aurora v1.1 · <strong>vortex / triple-black / cián-türkiz</strong></span>
+        <span>CF Worker backend · UI PWA-ready</span>
+      </footer>
+    </main>
+
+    <!-- Three.js (CDN, module) -->
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+      // ====== Vortex / aurora shader background ======
+      const canvas = document.getElementById("aurora-canvas");
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.z = 4;
+
+      const geometry = new THREE.PlaneGeometry(8, 4.5, 256, 128);
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          u_time: { value: 0.0 },
+          u_res: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            vec3 pos = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision highp float;
+          varying vec2 vUv;
+          uniform float u_time;
+          uniform vec2 u_res;
+
+          float noise(vec2 p){
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+          }
+
+          float fbm(vec2 p) {
+            float v = 0.0;
+            float a = 0.5;
+            mat2 rot = mat2(1.6, 1.2, -1.2, 1.6);
+            for(int i = 0; i < 5; i++) {
+              v += a * noise(p);
+              p = rot * p * 1.6;
+              a *= 0.5;
+            }
+            return v;
+          }
+
+          void main() {
+            vec2 uv = vUv;
+            vec2 p = uv * 2.0 - 1.0;
+
+            float t = u_time * 0.08;
+
+            // vortex polar coords
+            float r = length(p);
+            float angle = atan(p.y, p.x);
+            float swirl = angle + t * 1.5 + r * 5.0;
+
+            vec2 q = vec2(
+              cos(swirl) * r,
+              sin(swirl) * r
+            );
+
+            float n = fbm(q * 2.5 + t * 0.9);
+
+            // triple-black base
+            vec3 col = vec3(0.01, 0.01, 0.02);
+
+            // cián-fény
+            vec3 c1 = vec3(0.0, 0.98, 1.0);
+            // sötét türkiz
+            vec3 c2 = vec3(0.0, 0.78, 0.66);
+            // lila highlight
+            vec3 c3 = vec3(0.45, 0.35, 1.0);
+
+            float band1 = smoothstep(0.2, 0.85, n + 0.15);
+            float band2 = smoothstep(0.4, 1.0, n);
+            float band3 = smoothstep(0.6, 1.1, n + 0.05);
+
+            col += c1 * band1 * 0.9;
+            col += c2 * band2 * 0.7;
+            col += c3 * band3 * 0.5;
+
+            float vignette = smoothstep(1.5, 0.4, r);
+            col *= vignette;
+
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `,
+        transparent: false,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+
+      const resize = () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        material.uniforms.u_res.value.set(w, h);
+      };
+      window.addEventListener("resize", resize);
+      resize();
+
+      let start = performance.now();
+      const animate = () => {
+        const now = performance.now();
+        material.uniforms.u_time.value = (now - start) / 1000;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      };
+      animate();
+
+      // ====== UI + Fetch + WebSocket log stream ======
+      const syncBtn = document.getElementById("sync-btn");
+      const syncMode = document.getElementById("sync-mode");
+      const syncStatus = document.getElementById("sync-status");
+      const metricSyncState = document.getElementById("metric-sync-state");
+      const metricLastSha = document.getElementById("metric-last-sha");
+      const logStream = document.getElementById("log-stream");
+      const wsStatus = document.getElementById("ws-status");
+
+      const API_BASE =
+        window.location.origin === "null"
+          ? "https://YOUR-WORKER-URL.example.workers.dev"
+          : window.location.origin;
+
+      function pushLog(line, level = "info") {
+        const div = document.createElement("div");
+        div.className = `log-line ${level}`;
+        const ts = new Date().toISOString().split("T")[1].replace("Z", "");
+        div.innerHTML = `<span class="ts">${ts}</span><span class="tag">[UI]</span>${line}`;
+        logStream.appendChild(div);
+        logStream.scrollTop = logStream.scrollHeight;
+      }
+
+      async function runSync() {
+        const mode = syncMode.value;
+        syncBtn.disabled = true;
+        syncStatus.textContent = "Running sync…";
+        metricSyncState.textContent = "SYNC · RUNNING";
+        metricSyncState.style.borderColor = "rgba(0,245,255,0.8)";
+
+        pushLog(`Executing /api/sync mode=${mode}`);
+
+        try {
+          const res = await fetch(`${API_BASE}/api/sync`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ mode }),
+          });
+          const json = await res.json();
+
+          if (!res.ok) {
+            pushLog(`Sync failed: ${JSON.stringify(json)}`, "error");
+            syncStatus.textContent = "Sync failed.";
+            metricSyncState.textContent = "SYNC · ERROR";
+            metricSyncState.style.borderColor = "#ff8b8b";
+            return;
+          }
+
+          pushLog(`Sync OK: latestSha=${json.latestSha}`);
+          if (json.aiSummary) {
+            pushLog("AI diff summary:", "info");
+            pushLog(json.aiSummary, "info");
+          }
+
+          syncStatus.textContent = `Sync OK · ${json.latestSha ?? "no SHA"}`;
+          metricSyncState.textContent = "SYNC · STABLE";
+          metricSyncState.style.borderColor = "rgba(0,245,255,0.5)";
+          metricLastSha.textContent = `SHA · ${(json.latestSha || "–").slice(0, 7)}`;
+        } catch (e) {
+          pushLog(`Sync error: ${e}`, "error");
+          syncStatus.textContent = "Sync error.";
+          metricSyncState.textContent = "SYNC · ERROR";
+          metricSyncState.style.borderColor = "#ff8b8b";
+        } finally {
+          syncBtn.disabled = false;
+        }
+      }
+
+      syncBtn.addEventListener("click", runSync);
+
+      // WebSocket log stream
+      function connectWS() {
+        let wsUrl;
+        try {
+          const loc = window.location;
+          const proto = loc.protocol === "https:" ? "wss:" : "ws:";
+          wsUrl = `${proto}//${loc.host}/logs`;
+        } catch {
+          wsUrl = "wss://YOUR-WORKER-URL.example.workers.dev/logs";
+        }
+
+        const ws = new WebSocket(wsUrl);
+        wsStatus.textContent = "WS · CONNECTING";
+
+        ws.onopen = () => {
+          wsStatus.textContent = "WS · CONNECTED";
+          wsStatus.style.background = "rgba(0,245,255,0.16)";
+          pushLog("WebSocket connected.");
+        };
+
+        ws.onclose = () => {
+          wsStatus.textContent = "WS · CLOSED";
+          wsStatus.style.background = "rgba(200,80,80,0.16)";
+          pushLog("WebSocket closed. (demo stream)", "warn");
+        };
+
+        ws.onerror = () => {
+          wsStatus.textContent = "WS · ERROR";
+          wsStatus.style.background = "rgba(255,120,120,0.2)";
+          pushLog("WebSocket error.", "error");
+        };
+
+        ws.onmessage = (ev) => {
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg.type === "init" && Array.isArray(msg.logs)) {
+              msg.logs.forEach((l) => {
+                const div = document.createElement("div");
+                div.className = `log-line ${l.level}`;
+                div.innerHTML = `<span class="ts">${l.ts.split("T")[1].replace("Z", "")}</span><span class="tag">[WG]</span>${l.msg}`;
+                logStream.appendChild(div);
+              });
+              logStream.scrollTop = logStream.scrollHeight;
+            } else if (msg.type === "heartbeat") {
+              pushLog("heartbeat", "info");
+            } else if (msg.type === "echo") {
+              // ignore
+            }
+          } catch (e) {
+            pushLog("WS parse error: " + e, "error");
+          }
+        };
+      }
+
+      connectWS();
+      pushLog("ASA Aurora UI ready.");
+    </script>
+  </body>
+</html>
