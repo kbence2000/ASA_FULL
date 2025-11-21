@@ -1,53 +1,3 @@
-name = "workflow-slave"
-main = "worker.js"
-compatibility_date = "2025-01-01"
-compatibility_flags = [ "nodejs_compat" ]
-upload_format = "modules"
-
-# 🚫 No build step — NO npm, NO vite, NO bundler
-[build]
-command = ""
-
-# ==========================================
-# 🌐 ENVIRONMENT VARIABLES
-# These must be added in Cloudflare dashboard (Settings → Variables)
-# They are declared here for clarity – no secrets in file!
-# ==========================================
-
-[vars]
-GITHUB_OWNER = "kbence2000"
-GITHUB_REPO = "ASA_FULL"
-BASE_BRANCH = "main"
-
-# Optional but supported:
-# DEFAULT_PATHS = "src, apps, packages"
-
-# ==========================================
-# 🔐 SECRETS (DO NOT PUT THEM HERE)
-# Add them in Cloudflare Dashboard → Workers → workflow-slave → Settings → Variables
-# - GITHUB_TOKEN
-# - OPENAI_API_KEY
-# - CLOUDFLARE_API_TOKEN
-# ==========================================
-
-# ==========================================
-# 🔗 BINDINGS (if using KV, R2, D1, DO, Queues, Service Bindings)
-# Add only when needed
-# ==========================================
-
-# Example (remove if unused):
-# [[kv_namespaces]]
-# binding = "ASA_KV"
-# id = "xxxxxxxxxxxxxxxxxxxx"
-
-# ==========================================
-# 🛫 TRIGGERS (optional)
-# ==========================================
-
-# Example CRON (disabled by default):
-# [triggers]
-# crons = ["*/5 * * * *"]
-
 worker.ts – Cloudflare Worker entrypoint példának
 
 import { SupraVision } from "./asa-supravision";
@@ -110,3 +60,53 @@ export default {
     );
   },
 };
+
+name = "workflow-slave"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = [ "nodejs_compat" ]
+upload_format = "modules"
+
+# 🚫 No build step — NO npm, NO vite, NO bundler
+[build]
+command = ""
+
+# ==========================================
+# 🌐 ENVIRONMENT VARIABLES
+# These must be added in Cloudflare dashboard (Settings → Variables)
+# They are declared here for clarity – no secrets in file!
+# ==========================================
+
+[vars]
+GITHUB_OWNER = "kbence2000"
+GITHUB_REPO = "ASA_FULL"
+BASE_BRANCH = "main"
+
+# Optional but supported:
+# DEFAULT_PATHS = "src, apps, packages"
+
+# ==========================================
+# 🔐 SECRETS (DO NOT PUT THEM HERE)
+# Add them in Cloudflare Dashboard → Workers → workflow-slave → Settings → Variables
+# - GITHUB_TOKEN
+# - OPENAI_API_KEY
+# - CLOUDFLARE_API_TOKEN
+# ==========================================
+
+# ==========================================
+# 🔗 BINDINGS (if using KV, R2, D1, DO, Queues, Service Bindings)
+# Add only when needed
+# ==========================================
+
+# Example (remove if unused):
+# [[kv_namespaces]]
+# binding = "ASA_KV"
+# id = "xxxxxxxxxxxxxxxxxxxx"
+
+# ==========================================
+# 🛫 TRIGGERS (optional)
+# ==========================================
+
+# Example CRON (disabled by default):
+# [triggers]
+# crons = ["*/5 * * * *"]
