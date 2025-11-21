@@ -1,0 +1,10 @@
+name = "asa-multisync-engine"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+ADMIN_PASSWORD = "changeme" # ide tedd a login passwordot
+GITHUB_TOKEN = ""
+BASE44_API_URL = ""
+BASE44_API_KEY = ""
+OPENAI_API_KEY = ""
