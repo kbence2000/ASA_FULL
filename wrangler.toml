@@ -1,10 +1,24 @@
-name = "asa-multisync-engine"
-main = "worker.js"
-compatibility_date = "2025-01-01"
+# =========================
+# wrangler.toml
+# =========================
+name = "asa-aurora-multisync"
+main = "src/index.ts"
+compatibility_date = "2025-11-21"
 
+# --- KV binding az állapotnak (utolsó SHA, logok stb.) ---
+[[kv_namespaces]]
+binding = "ASA_STATE"
+id = "REPLACE_WITH_YOUR_KV_ID"
+
+# --- Env változók (Cloudflare dashboardon állítod) ---
 [vars]
-ADMIN_PASSWORD = "changeme" # ide tedd a login passwordot
-GITHUB_TOKEN = ""
-BASE44_API_URL = ""
-BASE44_API_KEY = ""
-OPENAI_API_KEY = ""
+GITHUB_OWNER = "kbence2000"
+GITHUB_REPO  = "asadesignv1"
+BASE44_API_URL = "https://your-base44-api-url.example.com"
+OPENAI_API_BASE = "https://api.openai.com/v1"
+OPENAI_MODEL = "gpt-4.1" # vagy amit akarsz
+# (OPENAI_API_KEY, GITHUB_TOKEN, BASE44_API_KEY: Secrets-ben!)
+
+# Ha Pages-en futtatod:
+[observability]
+enabled = true
