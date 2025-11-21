@@ -1,1 +1,1218 @@
-index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ASA Vortex Core Console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg-0: #000000;
+      --bg-1: #050608;
+      --bg-2: #050a0f;
+      --accent-1: #00ffd1; /* cián-zöld-kék */
+      --accent-2: #00b3ff; /* sötét türkiz-kék */
+      --accent-soft: rgba(0, 255, 209, 0.1);
+      --text-main: #f5f7ff;
+      --text-dim: #8b9bb5;
+      --danger: #ff4b81;
+      --ok: #3bff7a;
+      --font-main: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Inter", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #050a10 0%, #000000 55%, #000000 100%);
+      color: var(--text-main);
+      font-family: var(--font-main);
+    }
+
+    body {
+      position: relative;
+    }
+
+    /* === VORTEX BACKGROUND CANVAS === */
+
+    #vortex-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 0;
+    }
+
+    /* fólia a jobb kontraszthoz */
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at top, rgba(0, 255, 209, 0.12), transparent 60%),
+        radial-gradient(circle at bottom, rgba(0, 179, 255, 0.12), transparent 60%),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.95));
+      mix-blend-mode: screen;
+      z-index: 1;
+    }
+
+    /* finom scanline effekt */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.03) 1px,
+        transparent 1px
+      );
+      background-size: 100% 2px;
+      opacity: 0.25;
+      mix-blend-mode: soft-light;
+      z-index: 2;
+    }
+
+    /* === UI LAYOUT === */
+
+    .ui-root {
+      position: relative;
+      z-index: 3;
+      width: 100%;
+      height: 100%;
+      padding: clamp(16px, 3vw, 32px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .ui-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: radial-gradient(circle at top left, rgba(0, 255, 209, 0.15), transparent),
+        linear-gradient(to right, rgba(0, 0, 0, 0.9), rgba(5, 10, 16, 0.98));
+      border: 1px solid rgba(0, 255, 209, 0.25);
+      box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.8),
+        0 0 40px rgba(0, 255, 209, 0.3);
+      backdrop-filter: blur(18px);
+    }
+
+    .logo-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-orb {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 30%, #ffffff, #00ffd1 40%, #00b3ff 80%),
+        conic-gradient(from 140deg, #00ffd1, #00b3ff, #00ffd1);
+      box-shadow:
+        0 0 16px rgba(0, 255, 209, 0.9),
+        0 0 36px rgba(0, 179, 255, 0.9);
+      animation: orbPulse 3.2s ease-in-out infinite alternate;
+    }
+
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.1;
+    }
+
+    .logo-text span:nth-child(1) {
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .logo-text span:nth-child(2) {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: radial-gradient(circle at left, rgba(0, 255, 209, 0.4), transparent),
+        rgba(2, 40, 40, 0.9);
+      border: 1px solid rgba(0, 255, 209, 0.65);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--ok);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 12px rgba(59, 255, 122, 0.9);
+      animation: statusBlink 1.4s ease-in-out infinite;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 179, 255, 0.4);
+      background: radial-gradient(circle at top, rgba(0, 179, 255, 0.28), transparent),
+        rgba(2, 16, 24, 0.9);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* === MAIN LAYOUT === */
+
+    .ui-main {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2.5fr);
+      gap: 18px;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 900px) {
+      .ui-main {
+        grid-template-columns: 1fr;
+        grid-auto-rows: auto;
+      }
+    }
+
+    .panel {
+      position: relative;
+      border-radius: 24px;
+      padding: 16px 16px 18px;
+      background: radial-gradient(circle at top, rgba(0, 255, 209, 0.08), transparent),
+        radial-gradient(circle at bottom, rgba(0, 179, 255, 0.08), transparent),
+        rgba(0, 0, 0, 0.9);
+      border: 1px solid rgba(0, 255, 209, 0.24);
+      box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.9),
+        0 0 32px rgba(0, 179, 255, 0.35);
+      backdrop-filter: blur(22px);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--text-dim);
+    }
+
+    .panel-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 255, 209, 0.5);
+      background: radial-gradient(circle at top, rgba(0, 255, 209, 0.22), transparent),
+        rgba(0, 0, 0, 0.7);
+      color: var(--accent-1);
+    }
+
+    /* === ASA CORE HOLOGRAM === */
+
+    .core-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+      justify-content: center;
+      height: calc(100% - 2px);
+      padding: 10px 4px 10px;
+    }
+
+    .core-orbit {
+      position: relative;
+      width: min(380px, 70vw);
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.25), transparent 45%),
+        radial-gradient(circle at 50% 80%, rgba(0, 255, 209, 0.4), transparent 70%);
+      box-shadow:
+        0 0 40px rgba(0, 255, 209, 0.5),
+        0 0 72px rgba(0, 179, 255, 0.3);
+      border: 1px solid rgba(0, 255, 209, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .core-orbit::before {
+      content: "";
+      position: absolute;
+      inset: 20%;
+      border-radius: 50%;
+      border: 1px dashed rgba(0, 255, 209, 0.35);
+      box-shadow: 0 0 32px rgba(0, 255, 209, 0.5);
+      animation: orbitRing 9s linear infinite;
+      mix-blend-mode: screen;
+    }
+
+    .core-orbit::after {
+      content: "";
+      position: absolute;
+      inset: 35%;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 179, 255, 0.35);
+      box-shadow: 0 0 32px rgba(0, 179, 255, 0.6);
+      filter: blur(0.4px);
+      animation: orbitRing2 13s linear infinite;
+      mix-blend-mode: screen;
+    }
+
+    .core-pulse {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(circle, rgba(0, 255, 209, 0.28), transparent 55%);
+      opacity: 0.3;
+      animation: corePulse 3.8s ease-in-out infinite;
+      mix-blend-mode: screen;
+    }
+
+    .core-hologram {
+      position: relative;
+      width: 70%;
+      aspect-ratio: 4 / 3;
+      border-radius: 24px;
+      background:
+        linear-gradient(135deg, rgba(0, 255, 209, 0.18), rgba(0, 179, 255, 0.22)),
+        rgba(2, 12, 18, 0.96);
+      border: 1px solid rgba(0, 255, 209, 0.55);
+      box-shadow:
+        0 0 26px rgba(0, 255, 209, 0.55),
+        0 0 52px rgba(0, 179, 255, 0.5);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: space-between;
+      padding: 10px 12px;
+      transform: perspective(900px) rotateX(16deg) rotateY(-18deg);
+      transform-origin: center;
+      animation: holoFloat 10s ease-in-out infinite alternate;
+    }
+
+    .holo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    .holo-header span {
+      color: var(--text-dim);
+    }
+
+    .holo-header strong {
+      color: var(--accent-1);
+      font-weight: 600;
+    }
+
+    .holo-center {
+      flex: 1;
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      margin: 6px 0;
+    }
+
+    .holo-chip-main {
+      flex: 1.4;
+      border-radius: 18px;
+      padding: 8px 10px;
+      background: radial-gradient(circle at top, rgba(0, 255, 209, 0.4), transparent 65%),
+        rgba(0, 5, 12, 0.96);
+      border: 1px solid rgba(0, 255, 209, 0.7);
+      box-shadow:
+        0 0 18px rgba(0, 255, 209, 0.8),
+        0 0 34px rgba(0, 179, 255, 0.7) inset;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .holo-chip-main::before {
+      content: "";
+      position: absolute;
+      top: -150%;
+      left: -40%;
+      width: 80%;
+      height: 300%;
+      background: linear-gradient(
+        120deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.35) 50%,
+        transparent 100%
+      );
+      opacity: 0.7;
+      transform: translate3d(0, 0, 0) rotate(10deg);
+      animation: holoScan 4.5s linear infinite;
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .holo-chip-main-title {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(235, 255, 255, 0.9);
+      margin-bottom: 6px;
+    }
+
+    .holo-metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .holo-metric-row strong {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--accent-1);
+      text-shadow: 0 0 12px rgba(0, 255, 209, 0.9);
+    }
+
+    .holo-meter {
+      margin-top: 8px;
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(0, 25, 30, 0.9);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .holo-meter-fill {
+      position: absolute;
+      inset: 0;
+      width: 86%;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 255, 209, 0.1),
+        rgba(0, 255, 209, 1),
+        rgba(0, 179, 255, 1)
+      );
+      box-shadow: 0 0 18px rgba(0, 255, 209, 0.9);
+      border-radius: inherit;
+      transform-origin: left;
+      animation: meterPulse 2.8s ease-in-out infinite;
+    }
+
+    .holo-chip-side {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .holo-tag {
+      padding: 4px 6px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 179, 255, 0.55);
+      background: radial-gradient(circle at top, rgba(0, 179, 255, 0.3), transparent),
+        rgba(0, 5, 12, 0.9);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .holo-tag span {
+      max-width: 60%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .holo-tag strong {
+      color: var(--accent-2);
+      font-weight: 500;
+      font-size: 11px;
+    }
+
+    .holo-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .holo-footer .sparkline {
+      flex: 1;
+      height: 18px;
+      margin-left: 8px;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 255, 209, 0.2),
+        rgba(0, 179, 255, 0.9),
+        rgba(0, 255, 209, 0.2)
+      );
+      opacity: 0.6;
+      mask-image: radial-gradient(circle at center, black 0%, black 50%, transparent 100%);
+      animation: sparklineWave 5.6s linear infinite;
+    }
+
+    .core-caption {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* === LOG STREAM PANEL === */
+
+    .logs-root {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .log-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .log-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow:
+        0 0 10px rgba(255, 75, 129, 0.8),
+        0 0 18px rgba(255, 75, 129, 0.6);
+      animation: livePulse 1.3s ease-in-out infinite;
+    }
+
+    .log-filters {
+      display: flex;
+      gap: 6px;
+      font-size: 10px;
+    }
+
+    .log-filter-btn {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 179, 255, 0.4);
+      background: rgba(1, 10, 18, 0.96);
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.18s ease-out;
+    }
+
+    .log-filter-btn.active {
+      background: radial-gradient(circle at top, rgba(0, 255, 209, 0.4), transparent),
+        rgba(0, 10, 16, 0.98);
+      color: var(--accent-1);
+      border-color: rgba(0, 255, 209, 0.9);
+      box-shadow: 0 0 16px rgba(0, 255, 209, 0.5);
+    }
+
+    .log-window {
+      margin-top: 10px;
+      flex: 1;
+      min-height: 0;
+      border-radius: 18px;
+      background: radial-gradient(circle at top, rgba(0, 255, 209, 0.08), transparent),
+        rgba(0, 0, 0, 0.96);
+      border: 1px solid rgba(0, 179, 255, 0.5);
+      padding: 10px 10px 10px;
+      font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco,
+        Consolas, monospace;
+      font-size: 11px;
+      color: #e2f4ff;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .log-scroll {
+      position: absolute;
+      inset: 0;
+      padding: 8px 10px 10px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 255, 209, 0.7) rgba(0, 0, 0, 0.9);
+    }
+
+    .log-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .log-scroll::-webkit-scrollbar-thumb {
+      background: linear-gradient(
+        to bottom,
+        rgba(0, 255, 209, 0.2),
+        rgba(0, 255, 209, 0.8)
+      );
+      border-radius: 999px;
+    }
+
+    .log-line {
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-bottom: 4px;
+      opacity: 0;
+      transform: translateY(4px);
+      animation: logIn 0.22s ease-out forwards;
+    }
+
+    .log-line .ts {
+      color: rgba(139, 155, 181, 0.7);
+      margin-right: 6px;
+    }
+
+    .log-line .level {
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      margin-right: 6px;
+    }
+
+    .log-line .level.info {
+      border: 1px solid rgba(0, 179, 255, 0.8);
+      color: var(--accent-2);
+    }
+
+    .log-line .level.warn {
+      border: 1px solid rgba(255, 196, 87, 0.8);
+      color: #ffd15a;
+    }
+
+    .log-line .level.error {
+      border: 1px solid rgba(255, 75, 129, 0.9);
+      color: #ff9bbd;
+    }
+
+    .log-line .src {
+      color: rgba(139, 155, 181, 0.9);
+      margin-right: 6px;
+    }
+
+    .log-line .msg {
+      color: #e9f6ff;
+    }
+
+    .log-footer {
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .pill-mini {
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 255, 209, 0.4);
+      background: rgba(0, 10, 16, 0.9);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* === ANIMATIONS === */
+
+    @keyframes orbPulse {
+      0% {
+        transform: scale(1);
+        filter: blur(0.2px);
+      }
+      100% {
+        transform: scale(1.06);
+        filter: blur(1px);
+      }
+    }
+
+    @keyframes statusBlink {
+      0%,
+      100% {
+        opacity: 0.2;
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+
+    @keyframes orbitRing {
+      0% {
+        transform: rotate(0deg) scale(1);
+      }
+      100% {
+        transform: rotate(360deg) scale(1.02);
+      }
+    }
+
+    @keyframes orbitRing2 {
+      0% {
+        transform: rotate(360deg) scale(1);
+      }
+      100% {
+        transform: rotate(0deg) scale(0.98);
+      }
+    }
+
+    @keyframes corePulse {
+      0% {
+        opacity: 0.25;
+        transform: scale(0.98);
+      }
+      100% {
+        opacity: 0.6;
+        transform: scale(1.06);
+      }
+    }
+
+    @keyframes holoFloat {
+      0% {
+        transform: perspective(900px) rotateX(16deg) rotateY(-18deg) translateY(2px);
+      }
+      100% {
+        transform: perspective(900px) rotateX(11deg) rotateY(-10deg) translateY(-4px);
+      }
+    }
+
+    @keyframes holoScan {
+      0% {
+        transform: translate3d(0, -10%, 0) rotate(10deg);
+      }
+      100% {
+        transform: translate3d(0, 60%, 0) rotate(10deg);
+      }
+    }
+
+    @keyframes meterPulse {
+      0% {
+        transform: scaleX(0.84);
+      }
+      50% {
+        transform: scaleX(0.96);
+      }
+      100% {
+        transform: scaleX(0.86);
+      }
+    }
+
+    @keyframes sparklineWave {
+      0% {
+        background-position-x: 0%;
+      }
+      100% {
+        background-position-x: 220%;
+      }
+    }
+
+    @keyframes livePulse {
+      0% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+      50% {
+        transform: scale(1.2);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+    }
+
+    @keyframes logIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- VORTEX BACKGROUND -->
+  <canvas id="vortex-canvas"></canvas>
+  <div class="bg-overlay"></div>
+  <div class="scanlines"></div>
+
+  <!-- UI ROOT -->
+  <div class="ui-root">
+    <div class="ui-topbar">
+      <div class="logo-chip">
+        <div class="logo-orb"></div>
+        <div class="logo-text">
+          <span>ASA SYSTEM LAYER 2</span>
+          <span>AURORA VORTEX</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="status-pill">
+          <div class="status-dot"></div>
+          CORE ONLINE
+        </div>
+        <div class="chip">4K RUNTIME</div>
+        <div class="chip">WS LOG STREAM</div>
+      </div>
+    </div>
+
+    <div class="ui-main">
+      <!-- LEFT: ASA CORE HOLOGRAM -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">ASA Core Hologram</div>
+          <div class="panel-meta">
+            <span>Latency &lt; 40ms</span>
+            <span class="badge">L2 Cognitive Shell</span>
+          </div>
+        </div>
+        <div class="core-wrap">
+          <div class="core-orbit">
+            <div class="core-pulse"></div>
+            <div class="core-hologram">
+              <div class="holo-header">
+                <span>CORE ID: <strong>ASA-VORTEX-01</strong></span>
+                <span>MODE: <strong>AUTO-SYNC</strong></span>
+              </div>
+              <div class="holo-center">
+                <div class="holo-chip-main">
+                  <div class="holo-chip-main-title">Autonomous Sync Alignment</div>
+                  <div class="holo-metric-row">
+                    <span>Coherence</span>
+                    <strong id="coherence-val">98.6%</strong>
+                  </div>
+                  <div class="holo-meter">
+                    <div class="holo-meter-fill" id="coherence-meter"></div>
+                  </div>
+                  <div class="holo-metric-row" style="margin-top: 6px;">
+                    <span>GPT Channel</span>
+                    <span style="color: var(--accent-2);">
+                      gpt-5.1 &nbsp;•&nbsp; streaming
+                    </span>
+                  </div>
+                </div>
+                <div class="holo-chip-side">
+                  <div class="holo-tag">
+                    <span>Bridge Status</span>
+                    <strong id="bridge-status">STABLE</strong>
+                  </div>
+                  <div class="holo-tag">
+                    <span>Sync Horizon</span>
+                    <strong id="sync-horizon">+10.0 min</strong>
+                  </div>
+                  <div class="holo-tag">
+                    <span>Nodes (CF / GH / Base44)</span>
+                    <strong id="node-count">3 ACTIVE</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="holo-footer">
+                <span>ASA Holographic Layer · Realtime</span>
+                <div class="sparkline"></div>
+              </div>
+            </div>
+          </div>
+          <div class="core-caption">
+            ASA VORTEX ENGINE · EMERGING INTELLIGENT PIPELINE ORCHESTRATOR
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: REALTIME LOG STREAM -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Realtime Log Stream</div>
+          <div class="panel-meta">
+            <span>Channel: <strong>ASA / CORE / L2</strong></span>
+          </div>
+        </div>
+        <div class="logs-root">
+          <div class="log-toolbar">
+            <div class="log-toolbar-left">
+              <div class="live-dot"></div>
+              <span id="ws-status-label">Connecting…</span>
+            </div>
+            <div class="log-filters">
+              <button class="log-filter-btn active" data-level="all">ALL</button>
+              <button class="log-filter-btn" data-level="info">INFO</button>
+              <button class="log-filter-btn" data-level="warn">WARN</button>
+              <button class="log-filter-btn" data-level="error">ERROR</button>
+            </div>
+          </div>
+          <div class="log-window">
+            <div class="log-scroll" id="log-scroll"></div>
+          </div>
+          <div class="log-footer">
+            <span>WebSocket channel: <span id="ws-url-label">demo</span></span>
+            <span class="pill-mini">AUTO-SCROLL</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- THREE.JS / VORTEX SCRIPT -->
+  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+  <script>
+    (() => {
+      const canvas = document.getElementById("vortex-canvas");
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      const geometry = new THREE.PlaneGeometry(2, 2);
+
+      const uniforms = {
+        u_time: { value: 0 },
+        u_resolution: {
+          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        },
+      };
+
+      const material = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision highp float;
+          uniform float u_time;
+          uniform vec2 u_resolution;
+          varying vec2 vUv;
+
+          // simple hash noise
+          float hash(vec2 p) {
+            p = vec2(
+              dot(p, vec2(127.1, 311.7)),
+              dot(p, vec2(269.5, 183.3))
+            );
+            return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+          }
+
+          void main() {
+            vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / u_resolution.y;
+
+            float r = length(uv);
+            float angle = atan(uv.y, uv.x);
+
+            float t = u_time * 0.18;
+            float swirl = angle + t * 1.4;
+
+            float bands = sin(14.0 * r - 5.0 * swirl);
+            float coreGlow = smoothstep(0.75, 0.0, r);
+
+            float vignette = 1.0 - smoothstep(0.55, 0.95, r);
+
+            // noise for shimmer
+            float n = hash(uv * 440.0 + t);
+            float shimmer = 0.18 + 0.18 * n;
+
+            float intensity = (bands * 0.65 + 0.35) * coreGlow * vignette + shimmer * 0.3;
+
+            vec3 base1 = vec3(0.0, 0.98, 0.77);   // cián-zöld
+            vec3 base2 = vec3(0.0, 0.69, 0.99);   // türkiz-kék
+
+            float mixAmt = 0.5 + 0.5 * sin(swirl * 1.4 + t * 0.6);
+            vec3 col = mix(base1, base2, mixAmt);
+
+            // deepen blacks
+            col *= intensity;
+            col = pow(col, vec3(0.9));
+
+            // extra outer darkness
+            float edge = smoothstep(0.9, 1.4, r);
+            col *= (1.0 - edge);
+
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+
+      function resize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        renderer.setSize(w, h, false);
+        uniforms.u_resolution.value.set(w, h);
+      }
+
+      window.addEventListener("resize", resize);
+      resize();
+
+      let start = performance.now();
+      function animate() {
+        const t = performance.now();
+        uniforms.u_time.value = (t - start) / 1000;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+      animate();
+    })();
+  </script>
+
+  <!-- HOLOGRAM MICRO-ANIM LOGIC + WEBSOCKET LOG STREAM -->
+  <script>
+    // Simple micro-step animations for hologram metrics
+    (function () {
+      const coherenceEl = document.getElementById("coherence-val");
+      const syncHorizonEl = document.getElementById("sync-horizon");
+      const bridgeStatusEl = document.getElementById("bridge-status");
+      const meterEl = document.getElementById("coherence-meter");
+
+      let baseCoherence = 98.6;
+
+      setInterval(() => {
+        const delta = (Math.random() - 0.5) * 0.6;
+        baseCoherence = Math.max(94.5, Math.min(99.4, baseCoherence + delta));
+        coherenceEl.textContent = baseCoherence.toFixed(1) + "%";
+
+        const scale = 0.8 + (baseCoherence - 94.5) / 100;
+        meterEl.style.transform = "scaleX(" + scale.toFixed(2) + ")";
+
+        const horizon = 8 + Math.random() * 6;
+        syncHorizonEl.textContent = "+" + horizon.toFixed(1) + " min";
+
+        const states = ["STABLE", "OPTIMAL", "COHERENT"];
+        bridgeStatusEl.textContent =
+          states[Math.floor(Math.random() * states.length)];
+      }, 2600);
+    })();
+
+    // WebSocket log stream
+    (function () {
+      const logScroll = document.getElementById("log-scroll");
+      const wsStatusLabel = document.getElementById("ws-status-label");
+      const wsUrlLabel = document.getElementById("ws-url-label");
+      const filterButtons = Array.from(
+        document.querySelectorAll(".log-filter-btn")
+      );
+
+      let currentFilter = "all";
+
+      // IDE: ide tudsz valós WebSocket URL-t kötni
+      const WS_URL =
+        window.ASA_LOG_WS ||
+        "wss://example.com/asa/logs"; // placeholder – később env-ből töltöd
+
+      wsUrlLabel.textContent = WS_URL.includes("example.com") ? "demo-mode" : WS_URL;
+
+      filterButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          filterButtons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          currentFilter = btn.dataset.level;
+          // egyszerű filter: csak az új sorokra érvényes, a régieket nem rejti el – ez Lazy, de real-time feelingre jó
+        });
+      });
+
+      function appendLog({ level, src, msg }) {
+        if (currentFilter !== "all" && currentFilter !== level) {
+          // ha szűrve van, akkor is megjelenítjük, de halványabban? Most inkább egyszerű:
+          // return;
+        }
+
+        const line = document.createElement("div");
+        line.className = "log-line";
+        const now = new Date();
+        const ts =
+          now.toISOString().split("T")[1].replace("Z", "") + "Z";
+
+        line.innerHTML =
+          `<span class="ts">${ts}</span>` +
+          `<span class="level ${level}">${level}</span>` +
+          `<span class="src">[${src}]</span>` +
+          `<span class="msg">${msg}</span>`;
+
+        logScroll.appendChild(line);
+        // autoscroll
+        logScroll.scrollTop = logScroll.scrollHeight;
+      }
+
+      let demoInterval = null;
+      function startDemoLogs() {
+        wsStatusLabel.textContent = "DEMO stream · no WS bound";
+        demoInterval = setInterval(() => {
+          const levels = ["info", "info", "warn", "info", "error"];
+          const srcs = ["CF:worker", "GH:actions", "Base44:dev-terminal", "ASA:bridge"];
+          const msgs = [
+            "Sync heartbeat OK · 3 channels in phase",
+            "GitHub workflow run completed · status=success",
+            "Cloudflare Worker deploy complete · latency=38ms",
+            "Base44 environment ping OK · dev-terminal online",
+            "Retrying remote pipeline attach…",
+            "GPT-5.1 stream connected · ASA layer=2 mode=AUTO",
+            "Node density aligned · load=0.42",
+            "Log channel rotated · compressed archive stored",
+          ];
+
+          const level = levels[Math.floor(Math.random() * levels.length)];
+          const src = srcs[Math.floor(Math.random() * srcs.length)];
+          const msg = msgs[Math.floor(Math.random() * msgs.length)];
+
+          appendLog({ level, src, msg });
+        }, 1200);
+      }
+
+      function initWebSocket() {
+        if (WS_URL.includes("example.com")) {
+          startDemoLogs();
+          return;
+        }
+
+        wsStatusLabel.textContent = "Connecting WebSocket…";
+        let ws;
+        try {
+          ws = new WebSocket(WS_URL);
+        } catch (err) {
+          console.warn("WS error, falling back to demo:", err);
+          startDemoLogs();
+          return;
+        }
+
+        ws.addEventListener("open", () => {
+          wsStatusLabel.textContent = "Live · WS connected";
+          appendLog({
+            level: "info",
+            src: "ASA:ws",
+            msg: "WebSocket channel established",
+          });
+        });
+
+        ws.addEventListener("message", (event) => {
+          let payload = null;
+          try {
+            payload = JSON.parse(event.data);
+          } catch (_) {}
+
+          if (
+            payload &&
+            typeof payload.level === "string" &&
+            payload.msg
+          ) {
+            appendLog({
+              level: (payload.level || "info").toLowerCase(),
+              src: payload.src || "remote",
+              msg: payload.msg,
+            });
+          } else {
+            appendLog({
+              level: "info",
+              src: "raw",
+              msg: event.data,
+            });
+          }
+        });
+
+        ws.addEventListener("close", () => {
+          wsStatusLabel.textContent = "WS closed · demo fallback";
+          appendLog({
+            level: "warn",
+            src: "ASA:ws",
+            msg: "WebSocket closed, switching to demo stream",
+          });
+          startDemoLogs();
+        });
+
+        ws.addEventListener("error", (err) => {
+          console.warn("WS error:", err);
+          wsStatusLabel.textContent = "WS error · demo fallback";
+          appendLog({
+            level: "error",
+            src: "ASA:ws",
+            msg: "WebSocket error detected, using demo stream",
+          });
+          try {
+            ws.close();
+          } catch (_) {}
+          startDemoLogs();
+        });
+      }
+
+      initWebSocket();
+    })();
+  </script>
+</body>
+</html>
