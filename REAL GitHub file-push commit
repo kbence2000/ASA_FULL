@@ -1,0 +1,37 @@
+// === REAL GITHUB PUSH / COMMIT ===
+async function githubPushFile(
+  env: Env,
+  repoFull: string,
+  path: string,
+  newContent: string,
+  commitMsg: string
+) {
+  const meta = await fetch(`https://api.github.com/repos/${repoFull}/contents/${path}`, {
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      "User-Agent": "asa-multisync",
+    },
+  });
+
+  let existingSha = null;
+  if (meta.ok) {
+    const m = await meta.json();
+    existingSha = m.sha;
+  }
+
+  const res = await fetch(`https://api.github.com/repos/${repoFull}/contents/${path}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      message: commitMsg,
+      content: btoa(newContent),
+      sha: existingSha ?? undefined,
+    }),
+  });
+
+  const out = await res.json();
+  return { ok: res.ok, status: res.status, body: out };
+}
