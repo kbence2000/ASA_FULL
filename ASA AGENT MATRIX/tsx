@@ -1,0 +1,4 @@
+import { AsaCodeHarmonizerPanel } from "./AsaCodeHarmonizerPanel";
+
+// ...
+<AsaCodeHarmonizerPanel />
