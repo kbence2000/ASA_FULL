@@ -1,0 +1,102 @@
+import { useState } from 'react';
+
+export default function CodeHarmonizerPanel() {
+
+  const [path, setPath] = useState("");
+  const [diff, setDiff] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [loading, setLoading] = useState(false);
+
+  async function fetchDiff() {
+    setLoading(true);
+    setStatus("Fetching from GitHub…");
+
+    const res = await fetch(`/api/harmonize?file=${path}`);
+    const data = await res.json();
+
+    setDiff(data.diff || "No differences found.");
+    setStatus("Diff ready");
+    setLoading(false);
+  }
+
+  async function runHarmonizer() {
+    setLoading(true);
+    setStatus("Harmonizing via ASA Engine…");
+
+    const res = await fetch(`/api/harmonize/run`, { method: "POST", body: JSON.stringify({ file: path }) });
+    const data = await res.json();
+
+    setDiff(data.harmonized || "Harmonizer returned nothing.");
+    setStatus("Harmonized");
+    setLoading(false);
+  }
+
+  async function applyFix() {
+    setLoading(true);
+    setStatus("Applying changes (GitHub PR)…");
+
+    const res = await fetch(`/api/harmonize/apply`, { method: "POST", body: JSON.stringify({ file: path }) });
+    const data = await res.json();
+
+    setStatus(`Applied → PR: ${data.pr_url}`);
+    setLoading(false);
+  }
+
+  return (
+    <div className="bg-black text-white p-6 rounded-xl border border-[#005f73] shadow-[0_0_25px_#00f6ff55] relative">
+      
+      {/* VORTEX ANIMATION BACKGROUND */}
+      <div className="absolute inset-0 opacity-20">
+        <canvas id="vortexCanvas" className="w-full h-full"></canvas>
+      </div>
+
+      {/* UI CONTENT */}
+      <div className="relative z-10 space-y-6">
+
+        <h1 className="text-3xl font-bold text-[#00f6ff]">
+          ASA MATRIX — Code Harmonizer
+        </h1>
+
+        <input
+          type="text"
+          placeholder="Enter file path (e.g. /app/routes/api/index.js)"
+          className="w-full p-3 rounded bg-[#0a0a0a] border border-[#004b5c] text-[#00f6ff]"
+          value={path}
+          onChange={(e) => setPath(e.target.value)}
+        />
+
+        <button
+          onClick={fetchDiff}
+          className="w-full p-3 rounded bg-[#005f73] text-white font-bold hover:bg-[#007d99] transition">
+          🔍 Fetch Diff
+        </button>
+
+        <button
+          onClick={runHarmonizer}
+          className="w-full p-3 rounded bg-[#00f6ff] text-black font-bold hover:bg-[#4dfbff] transition">
+          ⚡ Run Harmonizer (ASA Engine)
+        </button>
+
+        <button
+          onClick={applyFix}
+          className="w-full p-3 rounded bg-[#00ffa3] text-black font-bold hover:bg-[#33ffb9] transition">
+          🚀 APPLY (PR → File Update)
+        </button>
+
+        <div className="bg-[#0c0c0c] border border-[#004b5c] p-4 rounded-xl text-sm text-[#d0fdfc] max-h-[350px] overflow-auto">
+          <pre>{diff}</pre>
+        </div>
+
+        <div className="text-center text-[#00ffa3] font-bold">
+          Status: {status}
+        </div>
+
+        {loading && (
+          <div className="text-center text-[#00f6ff] animate-pulse">
+            ⟳ Processing…
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
