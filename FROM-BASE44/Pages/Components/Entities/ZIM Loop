@@ -1,0 +1,61 @@
+{
+  "name": "ZIMLoop",
+  "type": "object",
+  "properties": {
+    "loopNumber": {
+      "type": "number",
+      "description": "Loop iteration number"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "RUN_CME_ANALYSIS",
+        "RUN_EVOLUTION",
+        "RUN_AAAN_PLANNING"
+      ],
+      "description": "Hypervisor decision action"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Decision reasoning"
+    },
+    "emotion": {
+      "type": "object",
+      "properties": {
+        "joy": {
+          "type": "number"
+        },
+        "stress": {
+          "type": "number"
+        }
+      },
+      "description": "Emotional state during loop"
+    },
+    "result": {
+      "type": "string",
+      "description": "Loop execution result"
+    },
+    "evolutionGenerated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether evolution was generated"
+    },
+    "memoryUpdates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Memory updates from this loop"
+    },
+    "sessionId": {
+      "type": "string",
+      "description": "Session identifier"
+    }
+  },
+  "required": [
+    "loopNumber",
+    "action",
+    "sessionId"
+  ]
+}
