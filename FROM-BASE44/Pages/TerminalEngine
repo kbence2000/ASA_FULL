@@ -1,0 +1,282 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { base44 } from '@/api/base44Client';
+
+export default function TerminalEngine() {
+  const [history, setHistory] = useState([]);
+  const [input, setInput] = useState('');
+  const [sessionId] = useState(crypto.randomUUID());
+  const [emotionState, setEmotionState] = useState({ happy: 33, neutral: 34, sad: 33 });
+  const outputRef = useRef(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setEmotionState(prev => {
+        const dominant = Object.keys(prev).reduce((a, b) => prev[a] > prev[b] ? a : b);
+        const newState = { ...prev };
+        Object.keys(newState).forEach(e => {
+          if (e === dominant) {
+            newState[e] = Math.min(100, Math.max(0, newState[e] + (Math.random() * 6 - 1)));
+          } else {
+            newState[e] = Math.min(100, Math.max(0, newState[e] + (Math.random() * 8 - 5)));
+          }
+        });
+        const total = newState.happy + newState.neutral + newState.sad;
+        Object.keys(newState).forEach(e => {
+          newState[e] = (newState[e] / total) * 100;
+        });
+        return newState;
+      });
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    }
+  }, [history]);
+
+  const streamText = async (text, isCommand = false) => {
+    const chars = text.split('');
+    let buffer = '';
+    
+    for (let i = 0; i < chars.length; i++) {
+      buffer += chars[i];
+      setHistory(prev => {
+        const newHistory = [...prev];
+        if (newHistory.length > 0 && !isCommand) {
+          newHistory[newHistory.length - 1] = { type: 'output', text: buffer, streaming: true };
+        }
+        return newHistory;
+      });
+      await new Promise(resolve => setTimeout(resolve, 18 + Math.random() * 20));
+    }
+    
+    setHistory(prev => {
+      const newHistory = [...prev];
+      if (newHistory.length > 0 && !isCommand) {
+        newHistory[newHistory.length - 1] = { type: 'output', text: buffer, streaming: false };
+      }
+      return newHistory;
+    });
+  };
+
+  const executeCommand = async (cmd) => {
+    const parts = cmd.trim().split(' ');
+    const command = parts[0].toLowerCase();
+    const args = parts.slice(1);
+
+    let output = '';
+
+    switch (command) {
+      case 'help':
+        output = `🧭 ELÉRHETŐ PARANCSOK:
+- help
+- clear
+- state
+- emotion
+- run <kód>
+- ai <szöveg>
+- hyper <utasítás>
+- explain <parancs>
+- session
+- agents`;
+        break;
+
+      case 'clear':
+        setHistory([]);
+        return;
+
+      case 'state':
+        const dominant = Object.keys(emotionState).reduce((a, b) => 
+          emotionState[a] > emotionState[b] ? a : b
+        );
+        const emoji = dominant === 'happy' ? '😀' : dominant === 'neutral' ? '😐' : '😢';
+        output = `SYSTEM STATE:
+- session: ${sessionId}
+- dominantEmotion: ${dominant} ${emoji}
+- Happy: ${emotionState.happy.toFixed(1)}%
+- Neutral: ${emotionState.neutral.toFixed(1)}%
+- Sad: ${emotionState.sad.toFixed(1)}%`;
+        break;
+
+      case 'emotion':
+        output = `ÉRZELMI ÁLLAPOT:
+😀 Happy: ${emotionState.happy.toFixed(1)}%
+😐 Neutral: ${emotionState.neutral.toFixed(1)}%
+😢 Sad: ${emotionState.sad.toFixed(1)}%
+Domináns: ${Object.keys(emotionState).reduce((a, b) => 
+  emotionState[a] > emotionState[b] ? a : b
+)}`;
+        break;
+
+      case 'run':
+        try {
+          const code = args.join(' ');
+          const result = eval(code);
+          output = `SAFE SANDBOX OUTPUT:\n${result}`;
+        } catch (err) {
+          output = `❌ Sandbox error: ${err.message}`;
+        }
+        break;
+
+      case 'session':
+        output = `SESSION ID: ${sessionId}`;
+        break;
+
+      case 'agents':
+        output = `ACTIVE AGENTS:\n- aiops\n- hypervisor\n- router\n- explain\n- terminal_engine`;
+        break;
+
+      case 'explain':
+        setIsStreaming(true);
+        try {
+          const explanation = await base44.integrations.Core.InvokeLLM({
+            prompt: `Magyarázd el részletesen ezt a parancsot mint AI OPS szakértő: ${args.join(' ')}`
+          });
+          output = explanation;
+        } catch (err) {
+          output = `❌ AI hiba: ${err.message}`;
+        } finally {
+          setIsStreaming(false);
+        }
+        break;
+
+      case 'ai':
+        setIsStreaming(true);
+        try {
+          const aiResponse = await base44.integrations.Core.InvokeLLM({
+            prompt: args.join(' ')
+          });
+          output = aiResponse;
+        } catch (err) {
+          output = `❌ AI hiba: ${err.message}`;
+        } finally {
+          setIsStreaming(false);
+        }
+        break;
+
+      case 'hyper':
+        setIsStreaming(true);
+        try {
+          const keyChars = [];
+          const payload = cmd;
+          for (let i = 3; i < payload.length; i += 4) {
+            keyChars.push(payload[i]);
+          }
+          const keyHint = keyChars.join('').slice(0, 8);
+          
+          const hyperResponse = await base44.integrations.Core.InvokeLLM({
+            prompt: `Rendszerérzelem: Happy: ${emotionState.happy.toFixed(1)}%, Neutral: ${emotionState.neutral.toFixed(1)}%, Sad: ${emotionState.sad.toFixed(1)}%
+Felhasználó kérése: ${args.join(' ')}
+Hypervisorként adj részletes választ.`
+          });
+          output = `HYPERVISOR:\nRX/TX keyHint: ${keyHint}\n\n${hyperResponse}`;
+        } catch (err) {
+          output = `❌ Hypervisor hiba: ${err.message}`;
+        } finally {
+          setIsStreaming(false);
+        }
+        break;
+
+      default:
+        output = `❓ Ismeretlen parancs: ${command}\nÍrd be: help`;
+    }
+
+    setHistory(prev => [...prev, { type: 'output', text: '', streaming: true }]);
+    await streamText(output);
+  };
+
+  const handleSubmit = async () => {
+    if (!input.trim() || isStreaming) return;
+    
+    setHistory(prev => [...prev, { type: 'command', text: input }]);
+    setInput('');
+    setIsStreaming(true);
+    
+    try {
+      await executeCommand(input);
+    } catch (err) {
+      setHistory(prev => [...prev, { type: 'output', text: `❌ Hiba: ${err.message}`, streaming: false }]);
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent rounded-3xl blur-3xl" />
+        
+        <div className="relative bg-gradient-to-br from-slate-900/95 via-indigo-950/90 to-purple-950/90 rounded-3xl border border-indigo-500/25 shadow-2xl p-6">
+          <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,rgba(255,255,255,0.05)_0px,rgba(255,255,255,0.03)_1px,transparent_2px,transparent_5px)] opacity-20 rounded-3xl pointer-events-none" />
+          
+          <div className="relative">
+            <div className="mb-4">
+              <h1 className="text-2xl font-bold text-indigo-400 mb-1" style={{ textShadow: '0 0 22px rgba(139,92,246,0.65)' }}>
+                ASA • Hypervisor Terminal
+              </h1>
+              <p className="text-xs text-slate-400">
+                Streaming • RX/TX Scrambled • Emotion-Aware Engine
+              </p>
+            </div>
+
+            <div 
+              ref={outputRef}
+              className="bg-black/25 border border-indigo-500/25 rounded-2xl p-4 h-[420px] overflow-y-auto font-mono text-sm mb-4"
+              style={{ boxShadow: 'inset 0 0 12px rgba(139,92,246,0.25)' }}
+            >
+              {history.map((item, idx) => (
+                <div key={idx} className="py-1">
+                  {item.type === 'command' ? (
+                    <div>
+                      <span className="text-indigo-400 font-semibold">asa@hypervisor</span>
+                      <span className="text-slate-400">:</span>
+                      <span className="text-slate-200"> {item.text}</span>
+                    </div>
+                  ) : (
+                    <div className="text-slate-300 whitespace-pre-wrap">
+                      {item.text}
+                      {item.streaming && (
+                        <span className="inline-block w-2 h-4 bg-indigo-400 ml-1 animate-pulse" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {history.length === 0 && (
+                <div className="text-slate-500 text-center mt-32">
+                  <div className="text-4xl mb-2">⚡</div>
+                  <div>Terminal ready. Type 'help' to start.</div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
+                disabled={isStreaming}
+                placeholder="írj be egy parancsot… (pl: ai Mi a status?)"
+                className="flex-1 bg-slate-900/50 border border-indigo-500/35 rounded-xl px-4 py-3 text-slate-200 font-mono outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25"
+                style={{ boxShadow: 'inset 0 0 14px rgba(139,92,246,0.25)' }}
+              />
+              <button
+                onClick={handleSubmit}
+                disabled={isStreaming || !input.trim()}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 px-6 py-3 rounded-xl font-semibold text-white transition-all active:scale-95"
+                style={{ boxShadow: '0 0 14px rgba(139,92,246,0.75)' }}
+              >
+                →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
