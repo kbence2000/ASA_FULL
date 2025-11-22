@@ -1,0 +1,72 @@
+{
+  "name": "TrainingSession",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Training session name"
+    },
+    "module_name": {
+      "type": "string",
+      "description": "Target AI module"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "paused"
+      ],
+      "default": "pending",
+      "description": "Training status"
+    },
+    "progress": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "Training progress percentage"
+    },
+    "epochs": {
+      "type": "number",
+      "description": "Total epochs"
+    },
+    "current_epoch": {
+      "type": "number",
+      "default": 0,
+      "description": "Current epoch"
+    },
+    "loss": {
+      "type": "number",
+      "description": "Current loss value"
+    },
+    "accuracy": {
+      "type": "number",
+      "description": "Current accuracy"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Start timestamp"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Completion timestamp"
+    },
+    "dataset": {
+      "type": "string",
+      "description": "Dataset used"
+    },
+    "hyperparameters": {
+      "type": "object",
+      "description": "Training hyperparameters"
+    }
+  },
+  "required": [
+    "name",
+    "module_name"
+  ]
+}
