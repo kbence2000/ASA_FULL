@@ -1,0 +1,142 @@
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { Card } from "@/components/ui/card";
+import { Shield, CheckCircle2, Clock, XCircle, AlertTriangle } from "lucide-react";
+import DevGuardianAudit from "../components/DevGuardianAudit";
+import DevGuardianTaskList from "../components/DevGuardianTaskList";
+import DevGuardianTaskDetail from "../components/DevGuardianTaskDetail";
+
+export default function DevGuardianDashboard() {
+  const [selectedTask, setSelectedTask] = useState(null);
+
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const { data: tasks } = useQuery({
+    queryKey: ['devGuardianTasks'],
+    queryFn: () => base44.entities.DevGuardianTask.list('-created_date', 1000),
+    initialData: [],
+  });
+
+  // Calculate stats
+  const totalTasks = tasks.length;
+  const pendingTasks = tasks.filter(t => t.status === 'pending').length;
+  const approvedTasks = tasks.filter(t => t.status === 'approved').length;
+  const criticalTasks = tasks.filter(t => t.severity === 'critical' && t.status === 'pending').length;
+
+  // Admin only
+  if (user && user.role !== 'admin') {
+    return (
+      <div className="min-h-screen p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="border p-12 text-center" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <h1 className="text-2xl font-bold text-white mb-2">Admin Only</h1>
+            <p className="text-gray-400">This page is only accessible to administrators.</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center animate-pulse-glow" style={{
+              background: 'linear-gradient(135deg, #8b5cff, #24e4ff)'
+            }}>
+              <Shield className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black gradient-text">DevGuardian</h1>
+              <p className="text-sm text-gray-400">AI-Powered System Architect & Code Auditor</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid md:grid-cols-4 gap-4">
+          <Card className="border p-4" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <div className="flex items-center gap-3">
+              <Shield className="w-8 h-8 text-cyan-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{totalTasks}</div>
+                <div className="text-sm text-gray-400">Total Tasks</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border p-4" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <div className="flex items-center gap-3">
+              <Clock className="w-8 h-8 text-yellow-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{pendingTasks}</div>
+                <div className="text-sm text-gray-400">Pending</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border p-4" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-8 h-8 text-green-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{approvedTasks}</div>
+                <div className="text-sm text-gray-400">Approved</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border p-4" style={{
+            background: criticalTasks > 0 
+              ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(251, 146, 60, 0.1))'
+              : 'rgba(15, 23, 42, 0.95)',
+            borderColor: criticalTasks > 0 
+              ? 'rgba(239, 68, 68, 0.5)'
+              : 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-8 h-8 text-red-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{criticalTasks}</div>
+                <div className="text-sm text-gray-400">Critical</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        {selectedTask ? (
+          <DevGuardianTaskDetail 
+            task={selectedTask} 
+            onBack={() => setSelectedTask(null)}
+          />
+        ) : (
+          <>
+            {/* Audit Control */}
+            <DevGuardianAudit />
+
+            {/* Tasks List */}
+            <DevGuardianTaskList onSelectTask={setSelectedTask} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
