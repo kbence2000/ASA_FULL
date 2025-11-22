@@ -1,0 +1,79 @@
+{
+  "name": "CodeProject",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "module",
+        "integration",
+        "experiment",
+        "prototype",
+        "production"
+      ],
+      "description": "Project type"
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "python",
+        "javascript",
+        "typescript",
+        "rust",
+        "cpp",
+        "other"
+      ],
+      "description": "Programming language"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "development",
+        "testing",
+        "deployed",
+        "archived"
+      ],
+      "default": "draft",
+      "description": "Project status"
+    },
+    "repository_url": {
+      "type": "string",
+      "description": "Git repository URL"
+    },
+    "description": {
+      "type": "string",
+      "description": "Project description"
+    },
+    "related_modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Related AI modules"
+    },
+    "last_commit": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last commit timestamp"
+    },
+    "build_status": {
+      "type": "string",
+      "enum": [
+        "passing",
+        "failing",
+        "pending"
+      ],
+      "default": "pending",
+      "description": "Build status"
+    }
+  },
+  "required": [
+    "name",
+    "type"
+  ]
+}
