@@ -1,0 +1,89 @@
+{
+  "name": "AIModule",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the AI module"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "CORE_SUPERSTRUCTURES",
+        "HIGH_TIER_AI_ENTITIES",
+        "DEFENSE_SHIELD_SYSTEMS",
+        "MATHEMATICAL_SIGNAL_AIS",
+        "DEVELOPMENT_BOOSTERS",
+        "ORCHESTRATION_LAYER"
+      ],
+      "description": "Module category"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "training",
+        "error",
+        "standby"
+      ],
+      "default": "standby",
+      "description": "Current operational status"
+    },
+    "health": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 100,
+      "description": "Health percentage 0-100"
+    },
+    "cpu_usage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "CPU usage percentage"
+    },
+    "memory_usage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "Memory usage percentage"
+    },
+    "requests_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Total requests processed"
+    },
+    "success_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 100,
+      "description": "Success rate percentage"
+    },
+    "last_active": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last activity timestamp"
+    },
+    "description": {
+      "type": "string",
+      "description": "Module description"
+    },
+    "version": {
+      "type": "string",
+      "default": "1.0.0",
+      "description": "Module version"
+    },
+    "config": {
+      "type": "object",
+      "description": "Module configuration JSON"
+    }
+  },
+  "required": [
+    "name",
+    "category"
+  ]
+}
