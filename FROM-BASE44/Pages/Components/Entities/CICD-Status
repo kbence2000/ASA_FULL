@@ -1,0 +1,87 @@
+import React from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Rocket, Loader2, CheckCircle2, XCircle, GitBranch } from 'lucide-react';
+
+export default function CICDStatus({ pipeline }) {
+  const getStageProgress = (stage) => {
+    const stages = { build: 25, test: 50, deploy: 75, completed: 100 };
+    return stages[stage] || 0;
+  };
+
+  const getStatusIcon = () => {
+    switch (pipeline.status) {
+      case 'success':
+        return <CheckCircle2 className="w-5 h-5 text-green-400" />;
+      case 'failed':
+        return <XCircle className="w-5 h-5 text-red-400" />;
+      case 'running':
+        return <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />;
+      default:
+        return <Rocket className="w-5 h-5 text-slate-400" />;
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (pipeline.status) {
+      case 'success':
+        return 'bg-green-500/10 text-green-400 border-green-500/30';
+      case 'failed':
+        return 'bg-red-500/10 text-red-400 border-red-500/30';
+      case 'running':
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+      default:
+        return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+    }
+  };
+
+  return (
+    <Card className="bg-slate-900/50 border-slate-800 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        {getStatusIcon()}
+        <h3 className="text-sm font-semibold text-white">CI/CD Pipeline</h3>
+        <Badge className={`ml-auto ${getStatusColor()}`}>
+          {pipeline.status}
+        </Badge>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <div className="flex justify-between text-xs mb-2">
+            <span className="text-slate-400">Build #{pipeline.build_number}</span>
+            <span className="text-slate-400">{pipeline.stage}</span>
+          </div>
+          <Progress value={getStageProgress(pipeline.stage)} className="h-2" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="p-2 rounded-lg bg-slate-800/50">
+            <p className="text-slate-400 mb-1">Tests</p>
+            <p className="text-white font-semibold">
+              {pipeline.tests_passed || 0} / {(pipeline.tests_passed || 0) + (pipeline.tests_failed || 0)}
+            </p>
+          </div>
+          <div className="p-2 rounded-lg bg-slate-800/50">
+            <p className="text-slate-400 mb-1">Coverage</p>
+            <p className="text-white font-semibold">{pipeline.coverage || 0}%</p>
+          </div>
+        </div>
+
+        {pipeline.deploy_url && (
+          <a
+            href={pipeline.deploy_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block p-3 rounded-lg bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-4 h-4 text-green-400" />
+              <span className="text-xs text-green-400 font-medium">View Deployment</span>
+            </div>
+          </a>
+        )}
+      </div>
+    </Card>
+  );
+}
