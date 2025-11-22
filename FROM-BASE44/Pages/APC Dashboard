@@ -1,0 +1,172 @@
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { Card } from "@/components/ui/card";
+import { Sparkles, Code2, TrendingUp, Brain, Activity as ActivityIcon } from "lucide-react";
+import APCIngestButton from "../components/APCIngestButton";
+import APCPatternList from "../components/APCPatternList";
+import APCInsights from "../components/APCInsights";
+import APCAutoIngest from "../components/APCAutoIngest";
+import APCActivityLog from "../components/APCActivityLog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+export default function APCDashboard() {
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const { data: patterns } = useQuery({
+    queryKey: ['apcPatterns'],
+    queryFn: () => base44.entities.APCPattern.list('-created_date', 1000),
+    initialData: [],
+  });
+
+  // Calculate stats
+  const totalPatterns = patterns.length;
+  const categories = {};
+  const languages = {};
+
+  patterns.forEach(p => {
+    if (p.category) categories[p.category] = (categories[p.category] || 0) + 1;
+    if (p.language) languages[p.language] = (languages[p.language] || 0) + 1;
+  });
+
+  const topCategory = Object.entries(categories).sort((a, b) => b[1] - a[1])[0];
+  const topLanguage = Object.entries(languages).sort((a, b) => b[1] - a[1])[0];
+
+  const avgInnovation = patterns.length > 0
+    ? Math.round(patterns.reduce((sum, p) => sum + (p.innovationScore || 0), 0) / patterns.length)
+    : 0;
+
+  // Admin only
+  if (user && user.role !== 'admin') {
+    return (
+      <div className="min-h-screen p-6">
+        <div className="max-w-7xl mx-auto">
+          <Card className="border p-12 text-center" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <h1 className="text-2xl font-bold text-white mb-2">Admin Only</h1>
+            <p className="text-gray-400">This page is only accessible to administrators.</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center animate-pulse-glow" style={{
+              background: 'linear-gradient(135deg, #8b5cff, #24e4ff)'
+            }}>
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black gradient-text">APC Dashboard</h1>
+              <p className="text-sm text-gray-400">Almighty Pattern Collector - AI-Powered Pattern Extraction</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid md:grid-cols-4 gap-4">
+          <Card className="border p-4" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <div className="flex items-center gap-3">
+              <Code2 className="w-8 h-8 text-cyan-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{totalPatterns}</div>
+                <div className="text-sm text-gray-400">Total Patterns</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border p-4" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <div className="flex items-center gap-3">
+              <TrendingUp className="w-8 h-8 text-green-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{Object.keys(categories).length}</div>
+                <div className="text-sm text-gray-400">Categories</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border p-4" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <div className="flex items-center gap-3">
+              <Brain className="w-8 h-8 text-purple-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">{avgInnovation}</div>
+                <div className="text-sm text-gray-400">Avg Innovation</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border p-4" style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(148, 163, 184, 0.35)'
+          }}>
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-8 h-8 text-yellow-400" />
+              <div>
+                <div className="text-lg font-bold text-white truncate">
+                  {topLanguage ? topLanguage[0] : 'N/A'}
+                </div>
+                <div className="text-sm text-gray-400">Top Language</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Auto-Ingest */}
+        <APCAutoIngest />
+
+        {/* Manual Ingest Button */}
+        <APCIngestButton />
+
+        {/* Tabs */}
+        <Tabs defaultValue="patterns" className="w-full">
+          <TabsList className="bg-[#0f1419] border border-[#1a1f2e]">
+            <TabsTrigger value="patterns" className="data-[state=active]:bg-cyan-600/20">
+              <Code2 className="w-4 h-4 mr-2" />
+              Patterns
+            </TabsTrigger>
+            <TabsTrigger value="insights" className="data-[state=active]:bg-purple-600/20">
+              <Brain className="w-4 h-4 mr-2" />
+              Insights
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="data-[state=active]:bg-green-600/20">
+              <ActivityIcon className="w-4 h-4 mr-2" />
+              Activity Log
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="patterns" className="mt-6">
+            <APCPatternList />
+          </TabsContent>
+
+          <TabsContent value="insights" className="mt-6">
+            <APCInsights />
+          </TabsContent>
+
+          <TabsContent value="activity" className="mt-6">
+            <APCActivityLog limit={50} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
