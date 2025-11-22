@@ -1,0 +1,102 @@
+{
+  "name": "SyncConfig",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Master enable/disable switch"
+    },
+    "interval_minutes": {
+      "type": "number",
+      "default": 10,
+      "description": "Sync interval in minutes"
+    },
+    "git_branch": {
+      "type": "string",
+      "default": "main",
+      "description": "Target Git branch"
+    },
+    "git_user_name": {
+      "type": "string",
+      "default": "TAC-SuperSync",
+      "description": "Git commit author name"
+    },
+    "git_user_email": {
+      "type": "string",
+      "default": "tac-sync@local",
+      "description": "Git commit author email"
+    },
+    "build_command": {
+      "type": "string",
+      "description": "Build command to run (e.g., npm run build)"
+    },
+    "test_command": {
+      "type": "string",
+      "description": "Test command to run (e.g., npm test)"
+    },
+    "use_ai_review": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable AI risk analysis"
+    },
+    "ai_model": {
+      "type": "string",
+      "default": "gpt-4",
+      "description": "OpenAI model for risk analysis"
+    },
+    "deploy_webhook_url": {
+      "type": "string",
+      "description": "Deployment webhook URL"
+    },
+    "auto_deploy_on_low_risk": {
+      "type": "boolean",
+      "default": true,
+      "description": "Auto-deploy on low risk changes"
+    },
+    "auto_deploy_on_medium_risk": {
+      "type": "boolean",
+      "default": false,
+      "description": "Auto-deploy on medium risk changes"
+    },
+    "cleanup_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable cleanup of old logs/temp files"
+    },
+    "cleanup_max_age_days": {
+      "type": "number",
+      "default": 7,
+      "description": "Max age for logs/temp files"
+    },
+    "paths_to_clean": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        ".logs",
+        ".tmp_builds"
+      ],
+      "description": "Paths to clean up"
+    },
+    "exclude_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        ".git",
+        "node_modules",
+        ".logs",
+        ".tmp_builds"
+      ],
+      "description": "Paths to exclude from monitoring"
+    }
+  },
+  "required": [
+    "enabled",
+    "interval_minutes",
+    "git_branch"
+  ]
+}
