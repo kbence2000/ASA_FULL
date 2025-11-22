@@ -1,0 +1,322 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+
+export default function ASAEngine() {
+  const [input, setInput] = useState('');
+  const [terminal, setTerminal] = useState([
+    { prefix: '[ASA]', content: 'Booting ASA Hyper Terminal v1.0 ...', type: 'ai' },
+    { prefix: '[ASA]', content: 'Modes available: /mode cme, /mode aaan · Type your instructions below.', type: 'ai' }
+  ]);
+  const [mode, setMode] = useState('cme');
+  const [sessionId] = useState(`asa-${Math.random().toString(16).slice(2, 10)}`);
+  const [reqCount, setReqCount] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [emotion, setEmotion] = useState({ joy: 0.7, focus: 0.5, stress: 0.2 });
+  const scrollRef = useRef(null);
+  const queryClient = useQueryClient();
+
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const userId = user?.email || sessionId;
+
+  const { data: memories = [] } = useQuery({
+    queryKey: ['memories', userId],
+    queryFn: () => base44.entities.MemoryItem.filter({ userId }, '-updated_date', 10),
+    enabled: !!userId,
+  });
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [terminal]);
+
+  const addLine = (prefix, content, type = 'default') => {
+    setTerminal(prev => [...prev, { prefix, content, type }]);
+  };
+
+  const updateEmotion = (success) => {
+    const baseJoy = mode === 'cme' ? 0.7 : 0.5;
+    const baseFocus = mode === 'aaan' ? 0.7 : 0.5;
+    const baseStress = success ? 0.2 : 0.6;
+
+    setEmotion({
+      joy: Math.max(0.1, Math.min(1, baseJoy + (Math.random() - 0.5) * 0.3)),
+      focus: Math.max(0.1, Math.min(1, baseFocus + (Math.random() - 0.5) * 0.3)),
+      stress: Math.max(0.1, Math.min(1, baseStress + (Math.random() - 0.5) * 0.3))
+    });
+  };
+
+  const executeMutation = useMutation({
+    mutationFn: async (userInput) => {
+      if (userInput.startsWith('/mode')) {
+        const newMode = userInput.split(/\s+/)[1]?.toLowerCase();
+        if (newMode === 'cme' || newMode === 'aaan') {
+          setMode(newMode);
+          addLine('[LOCAL]', `Switched to ${newMode.toUpperCase()} mode.`, 'command');
+          return null;
+        }
+        addLine('[LOCAL]', `Unknown mode: ${newMode}`, 'warn');
+        return null;
+      }
+
+      addLine('you', userInput, 'command');
+      setIsProcessing(true);
+      setReqCount(prev => prev + 1);
+
+      const memoryContext = memories.slice(0, 10).map(m => `MEMO: ${m.content}`).join('\n');
+
+      let systemPrompt, prompt;
+
+      if (mode === 'cme') {
+        systemPrompt = `You are ASA Cognitive Memory Engine (CME).
+Your job is to track long-term context, summarize, and update user/project memory.
+Always output TWO sections:
+1) RESPONSE: what you say to the user
+2) MEMORY_UPDATE: concise bullet list of new/updated facts to store (or 'NONE')`;
+
+        prompt = `${memoryContext ? 'CONTEXT:\n' + memoryContext + '\n\n' : ''}USER: ${userInput}`;
+      } else {
+        systemPrompt = `You are ASA Autonomous Agent Network (AAAN).
+You internally simulate multiple agents: PLANNER, ARCHITECT, EXECUTOR.
+Always output THREE sections:
+1) PLAN: high-level steps
+2) ARCHITECTURE: technical/operational design
+3) EXECUTION: concrete actions, commands, or code
+Keep it concise but high quality, suitable for AI OPS / remote deploy / debug.`;
+
+        prompt = `${memoryContext ? 'CONTEXT:\n' + memoryContext + '\n\n' : ''}USER: ${userInput}`;
+      }
+
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `${systemPrompt}\n\n${prompt}`
+      });
+
+      // Store memory updates
+      if (mode === 'cme') {
+        const memMatch = response.match(/MEMORY_UPDATE\s*:(.*)$/is);
+        if (memMatch) {
+          const updates = memMatch[1].split('\n')
+            .map(l => l.trim())
+            .filter(l => l && !l.toLowerCase().startsWith('none'));
+          
+          for (const update of updates.slice(0, 3)) {
+            await base44.entities.MemoryItem.create({
+              userId,
+              kind: 'FACT',
+              importance: 0.7,
+              recencyScore: 1.0,
+              source: 'assistant',
+              content: update,
+              tags: ['asa-cme']
+            });
+          }
+        }
+      } else {
+        const planSnippet = response.substring(0, 400).replace(/\s+/g, ' ');
+        await base44.entities.MemoryItem.create({
+          userId,
+          kind: 'TASK',
+          importance: 0.8,
+          recencyScore: 1.0,
+          source: 'assistant',
+          content: `AAAN_PLAN: ${planSnippet}`,
+          tags: ['asa-aaan', 'plan']
+        });
+      }
+
+      queryClient.invalidateQueries(['memories']);
+      return response;
+    },
+    onSuccess: (response) => {
+      if (response) {
+        addLine('[ASA]', response, 'ai');
+        updateEmotion(true);
+      }
+    },
+    onError: (err) => {
+      addLine('[ASA]', `Error: ${err.message}`, 'error');
+      updateEmotion(false);
+    },
+    onSettled: () => {
+      setIsProcessing(false);
+    }
+  });
+
+  const handleSubmit = () => {
+    if (!input.trim() || isProcessing) return;
+    executeMutation.mutate(input);
+    setInput('');
+  };
+
+  return (
+    <div className="max-w-[1200px] mx-auto">
+      <div className="relative bg-gradient-to-br from-slate-900/95 via-indigo-950/90 to-purple-950/90 rounded-3xl border border-indigo-500/25 shadow-2xl overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent blur-3xl" />
+        
+        <div className="relative border-b border-slate-800 p-4 bg-gradient-to-r from-slate-900/95 to-indigo-950/90">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 via-green-400 to-cyan-400 animate-pulse" style={{ boxShadow: '0 0 28px rgba(168,85,247,0.9), 0 0 60px rgba(34,197,94,0.7)' }} />
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-wider text-white">ASA Hyper Terminal</div>
+                <div className="text-xs text-slate-400 flex items-center gap-2">
+                  Cognitive Memory Engine · Autonomous Agent Network
+                  <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-[10px] uppercase tracking-wider">PWA · Dev Terminal</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-slate-300">{isProcessing ? 'PROCESSING · GPT-5.1 ...' : 'ONLINE · GPT-5.1 BACKEND'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+          <div className="lg:col-span-2">
+            <div className="bg-gradient-to-br from-slate-900/90 to-indigo-950/80 rounded-2xl border border-slate-700 overflow-hidden" style={{ minHeight: 'min(55vh, 500px)' }}>
+              <div className="border-b border-slate-700 p-3 bg-gradient-to-r from-slate-900 to-indigo-900/50 flex items-center justify-between">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-300">ASA Dev Terminal · Streaming</div>
+                <div className="px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/40 text-[10px] uppercase tracking-wider text-blue-300">
+                  {mode === 'cme' ? 'CME Mode' : 'AAAN Mode'}
+                </div>
+              </div>
+
+              <div className="p-3 font-mono text-xs text-slate-200 flex flex-col" style={{ height: 'calc(min(55vh, 500px) - 120px)' }}>
+                <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-1 pr-2">
+                  {terminal.map((line, idx) => (
+                    <div key={idx} className="flex gap-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                      <div className="text-slate-500 shrink-0">{line.prefix}</div>
+                      <div className={`break-words ${
+                        line.type === 'command' ? 'text-indigo-300' :
+                        line.type === 'ai' ? 'text-green-400' :
+                        line.type === 'warn' ? 'text-yellow-400' :
+                        line.type === 'error' ? 'text-red-400' :
+                        'text-slate-300'
+                      }`}>
+                        {line.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <div className="text-indigo-400 text-[11px]">asa@dev:~$</div>
+                    <input
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
+                      disabled={isProcessing}
+                      placeholder="írj ide parancsot vagy AI promptot, pl. 'tervezz nekem egy super sync pipeline-t'"
+                      className="flex-1 bg-slate-900/50 border border-slate-700 rounded-full px-3 py-1.5 text-xs outline-none focus:border-indigo-500"
+                    />
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!input.trim() || isProcessing}
+                      className="px-3 py-1.5 rounded-full text-xs uppercase tracking-wider bg-gradient-to-r from-purple-600 to-indigo-600 text-white disabled:opacity-40"
+                      style={{ boxShadow: '0 0 14px rgba(168,85,247,0.9)' }}
+                    >
+                      RUN ⏵
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 text-[10px] text-slate-500">
+                    <span>MODE:</span>
+                    <button
+                      onClick={() => { setMode('cme'); addLine('[LOCAL]', 'Switched to CME mode.', 'command'); }}
+                      className={`px-2 py-0.5 rounded-full border ${mode === 'cme' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}`}
+                    >
+                      CME (Memory)
+                    </button>
+                    <button
+                      onClick={() => { setMode('aaan'); addLine('[LOCAL]', 'Switched to AAAN mode.', 'command'); }}
+                      className={`px-2 py-0.5 rounded-full border ${mode === 'aaan' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}`}
+                    >
+                      AAAN (Agents)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-900/90 to-indigo-950/80 rounded-2xl border border-slate-700 p-4 space-y-4">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-white mb-1">Emotion Matrix · Live Telemetry</div>
+              <div className="text-[10px] text-slate-400 mb-2">
+                Space (😊) · Resonance (😐) · AirPressure (😢)
+              </div>
+              <div className="flex gap-2">
+                {[
+                  { label: 'Space', emoji: '😊', key: 'joy' },
+                  { label: 'Resonance', emoji: '😐', key: 'focus' },
+                  { label: 'AirPressure', emoji: '😢', key: 'stress' }
+                ].map(({ label, emoji, key }) => (
+                  <div key={key} className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">{label}</span>
+                    <span className="text-base">{emoji}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-indigo-900/30 to-slate-900 rounded-xl border border-slate-700 p-3 flex-1">
+              <div className="flex justify-between items-center mb-2 text-[10px]">
+                <span className="uppercase tracking-wider text-white">Session Load Vector</span>
+                <span className="text-indigo-400">{mode === 'cme' ? 'CME: 60 · AAAN: 40' : 'CME: 35 · AAAN: 65'}</span>
+              </div>
+              <div className="flex items-end gap-2 h-24">
+                {[
+                  { value: emotion.joy, label: '😊' },
+                  { value: emotion.focus, label: '😐' },
+                  { value: emotion.stress, label: '😢' }
+                ].map(({ value, label }, idx) => (
+                  <div key={idx} className="flex-1 bg-slate-900 rounded-full relative overflow-hidden">
+                    <div
+                      className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-purple-600 to-green-400 transition-all duration-700"
+                      style={{ height: `${value * 100}%`, boxShadow: '0 0 12px rgba(168,85,247,0.9)' }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-[9px] text-slate-500 mt-1">
+                <span>😊 Joy</span>
+                <span>😐 Focus</span>
+                <span>😢 Stress</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {[
+                { label: 'ASA Cognitive Memory Engine · ONLINE', status: 'success' },
+                { label: 'ASA Autonomous Agent Network · ONLINE', status: 'success' },
+                { label: 'DEV TERMINAL · STREAMING', status: 'warn' },
+                { label: 'RX/TX Scrambling · SOFT', status: 'success' }
+              ].map((chip, idx) => (
+                <div key={idx} className="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-900/50 border border-slate-700 text-[10px]">
+                  <div className={`w-1.5 h-1.5 rounded-full ${chip.status === 'warn' ? 'bg-yellow-400' : 'bg-green-400'}`} style={{ boxShadow: `0 0 8px ${chip.status === 'warn' ? 'rgba(250,204,21,0.95)' : 'rgba(34,197,94,0.95)'}` }} />
+                  <span className="text-slate-300">{chip.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-between items-center text-[10px] text-slate-500">
+              <span>SESSION: <span className="text-slate-300 font-mono">{sessionId}</span></span>
+              <span>Req: <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300 font-mono">{String(reqCount).padStart(3, '0')}</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
