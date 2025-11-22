@@ -1,0 +1,267 @@
+import React, { useState } from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Shield, ShieldAlert, ShieldCheck, Zap, Lock, AlertTriangle, Eye, Activity, Circle } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+export default function SecurityShield() {
+  const [threats, setThreats] = useState([
+    { id: 1, type: 'Prompt Injection', severity: 'critical', status: 'blocked', time: '2 min ago', source: '45.123.67.89' },
+    { id: 2, type: 'SQL Injection Attempt', severity: 'high', status: 'blocked', time: '5 min ago', source: '192.168.1.45' },
+    { id: 3, type: 'XSS Attack', severity: 'medium', status: 'blocked', time: '12 min ago', source: '10.0.0.23' },
+    { id: 4, type: 'DDoS Pattern', severity: 'high', status: 'mitigated', time: '18 min ago', source: '172.16.0.1' },
+  ]);
+
+  const securityScore = 98;
+
+  const attackData = [
+    { time: '00:00', attacks: 3 },
+    { time: '04:00', attacks: 1 },
+    { time: '08:00', attacks: 5 },
+    { time: '12:00', attacks: 2 },
+    { time: '16:00', attacks: 4 },
+    { time: '20:00', attacks: 1 },
+    { time: '24:00', attacks: 2 },
+  ];
+
+  const getSeverityColor = (severity) => {
+    const colors = {
+      critical: 'text-red-400 bg-red-500/10 border-red-500/30',
+      high: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
+      medium: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+      low: 'text-green-400 bg-green-500/10 border-green-500/30',
+    };
+    return colors[severity] || colors.low;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold text-white mb-2 glow-text">Security Shield</h1>
+          <p className="text-slate-400">Advanced AI defense against prompt injection & cyber attacks</p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30">
+          <ShieldCheck className="w-5 h-5 text-green-400" />
+          <span className="text-sm font-medium text-white">Protected</span>
+        </div>
+      </div>
+
+      {/* Security Score */}
+      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">Overall Security Score</h2>
+            <p className="text-sm text-slate-400">Real-time threat protection status</p>
+          </div>
+          <div className="text-right">
+            <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400">
+              {securityScore}
+            </div>
+            <p className="text-xs text-slate-400 mt-1">out of 100</p>
+          </div>
+        </div>
+        <Progress value={securityScore} className="h-3 bg-slate-800" />
+      </Card>
+
+      {/* Defense Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/10">
+              <ShieldCheck className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">847</p>
+              <p className="text-xs text-slate-400">Threats Blocked</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-red-500/10">
+              <ShieldAlert className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">23</p>
+              <p className="text-xs text-slate-400">Critical Blocks Today</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-cyan-500/10">
+              <Activity className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">99.9%</p>
+              <p className="text-xs text-slate-400">Block Rate</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/10">
+              <Zap className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">0.3ms</p>
+              <p className="text-xs text-slate-400">Avg Response</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Attack Timeline */}
+      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-white">Attack Timeline (24h)</h2>
+          <Circle className="w-2 h-2 text-green-400 fill-green-400 pulse-dot" />
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={attackData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <XAxis dataKey="time" stroke="#64748b" style={{ fontSize: '12px' }} />
+            <YAxis stroke="#64748b" style={{ fontSize: '12px' }} />
+            <Tooltip 
+              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+              labelStyle={{ color: '#e2e8f0' }}
+            />
+            <Line type="monotone" dataKey="attacks" stroke="#ef4444" strokeWidth={2} dot={{ fill: '#ef4444', r: 4 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Recent Threats */}
+      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-6">
+        <h2 className="text-lg font-bold text-white mb-4">Recent Threat Activity</h2>
+        <div className="space-y-3">
+          {threats.map((threat) => (
+            <div key={threat.id} className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-red-500/30 transition-all">
+              <div className="flex items-center gap-4 flex-1">
+                <div className={`p-2 rounded-lg ${getSeverityColor(threat.severity)} border`}>
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-medium text-white">{threat.type}</p>
+                    <Badge className={`${getSeverityColor(threat.severity)} border text-xs`}>
+                      {threat.severity}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-slate-400">
+                    <span>Source: <span className="text-slate-300 font-mono">{threat.source}</span></span>
+                    <span>•</span>
+                    <span>{threat.time}</span>
+                  </div>
+                </div>
+              </div>
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                {threat.status}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Defense Modules */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-red-500 to-orange-600">
+              <ShieldAlert className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Prompt Injection Shield</h3>
+            </div>
+          </div>
+          <p className="text-sm text-slate-400 mb-4">
+            Advanced AI layer that detects and neutralizes prompt injection attacks in real-time
+          </p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500">Status</span>
+            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+              Active
+            </Badge>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600">
+              <Lock className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Semantic Engine</h3>
+            </div>
+          </div>
+          <p className="text-sm text-slate-400 mb-4">
+            Deep semantic analysis to prevent context manipulation and jailbreak attempts
+          </p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500">Status</span>
+            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+              Active
+            </Badge>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600">
+              <Eye className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">White Noise Defense</h3>
+            </div>
+          </div>
+          <p className="text-sm text-slate-400 mb-4">
+            Multi-layered noise generation system that obscures attack patterns and vectors
+          </p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500">Status</span>
+            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+              Active
+            </Badge>
+          </div>
+        </Card>
+      </div>
+
+      {/* Protection Layers */}
+      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-6">
+        <h2 className="text-lg font-bold text-white mb-4">Multi-Layer Protection System</h2>
+        <div className="space-y-3">
+          {[
+            { layer: 'Input Validation Layer', status: 'operational', efficiency: 99.8 },
+            { layer: 'Semantic Analysis Layer', status: 'operational', efficiency: 99.5 },
+            { layer: 'Pattern Recognition Layer', status: 'operational', efficiency: 98.9 },
+            { layer: 'White Noise Generation', status: 'operational', efficiency: 99.9 },
+            { layer: 'Response Sanitization', status: 'operational', efficiency: 100 },
+          ].map((item, idx) => (
+            <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700/30">
+              <div className="flex items-center gap-3 flex-1">
+                <ShieldCheck className="w-4 h-4 text-green-400" />
+                <span className="text-sm text-white">{item.layer}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-32">
+                  <Progress value={item.efficiency} className="h-2 bg-slate-700" />
+                </div>
+                <span className="text-xs text-green-400 font-medium w-12 text-right">{item.efficiency}%</span>
+                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                  {item.status}
+                </Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
