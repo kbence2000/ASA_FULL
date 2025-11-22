@@ -1,0 +1,90 @@
+import React from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle2, Circle, Loader2, XCircle, AlertTriangle } from 'lucide-react';
+
+export default function SyncPipelineVisualizer({ sync }) {
+  const phases = [
+    { name: 'Detection', status: sync ? 'completed' : 'idle', icon: Circle },
+    { name: 'AI Risk', status: sync?.risk_level ? 'completed' : 'pending', icon: AlertTriangle },
+    { name: 'Build/Test', status: sync?.build_status || 'pending', icon: Circle },
+    { name: 'Git Push', status: sync?.github_commit_sha ? 'completed' : 'pending', icon: Circle },
+    { name: 'Deploy', status: sync?.deploy_status || 'pending', icon: Circle },
+    { name: 'Cleanup', status: sync?.cleanup_performed ? 'completed' : 'pending', icon: Circle },
+  ];
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'completed':
+      case 'success':
+      case 'deployed':
+        return <CheckCircle2 className="w-5 h-5 text-green-400" />;
+      case 'running':
+      case 'deploying':
+      case 'analyzing':
+        return <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />;
+      case 'failed':
+        return <XCircle className="w-5 h-5 text-red-400" />;
+      case 'skipped':
+        return <Circle className="w-5 h-5 text-yellow-400" />;
+      default:
+        return <Circle className="w-5 h-5 text-slate-600" />;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed':
+      case 'success':
+      case 'deployed':
+        return 'text-green-400';
+      case 'running':
+      case 'deploying':
+      case 'analyzing':
+        return 'text-cyan-400';
+      case 'failed':
+        return 'text-red-400';
+      case 'skipped':
+        return 'text-yellow-400';
+      default:
+        return 'text-slate-600';
+    }
+  };
+
+  return (
+    <Card className="bg-slate-900/50 border-slate-800 p-6">
+      <h3 className="text-lg font-bold text-white mb-4">Sync Pipeline Phases</h3>
+      <div className="space-y-3">
+        {phases.map((phase, idx) => (
+          <div key={idx} className="flex items-center gap-3">
+            {getStatusIcon(phase.status)}
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">{phase.name}</p>
+              <p className={`text-xs ${getStatusColor(phase.status)}`}>
+                {phase.status === 'pending' ? 'Waiting' : phase.status}
+              </p>
+            </div>
+            {idx < phases.length - 1 && (
+              <div className="w-px h-8 bg-slate-700 ml-2" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {sync?.risk_level && (
+        <div className="mt-4 p-3 rounded-lg bg-slate-800/50">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-slate-400">AI Risk Level:</span>
+            <Badge className={
+              sync.risk_level === 'low' ? 'bg-green-500/10 text-green-400 border-green-500/30' :
+              sync.risk_level === 'medium' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' :
+              'bg-red-500/10 text-red-400 border-red-500/30'
+            }>
+              {sync.risk_level.toUpperCase()}
+            </Badge>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
