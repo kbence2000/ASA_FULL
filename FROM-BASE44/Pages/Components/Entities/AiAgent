@@ -1,0 +1,117 @@
+{
+  "name": "AiOpsRequest",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "description": "Unique request identifier"
+    },
+    "requested_by": {
+      "type": "string",
+      "description": "User who requested the operation"
+    },
+    "description": {
+      "type": "string",
+      "description": "Natural language problem description"
+    },
+    "task_kind": {
+      "type": "string",
+      "enum": [
+        "bugfix",
+        "performance",
+        "security",
+        "deployment",
+        "infra",
+        "refactor",
+        "custom"
+      ],
+      "description": "Type of AI OPS task"
+    },
+    "preferred_env": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "default": "staging",
+      "description": "Target environment"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "planning",
+        "quoted",
+        "executing",
+        "completed",
+        "failed",
+        "blocked"
+      ],
+      "default": "pending",
+      "description": "Current request status"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "description": "Overall severity level"
+    },
+    "auto_apply": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow automatic execution"
+    },
+    "max_budget_eur": {
+      "type": "number",
+      "description": "Maximum budget cap in EUR"
+    },
+    "plan_steps": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Generated execution plan steps"
+    },
+    "estimated_minutes": {
+      "type": "number",
+      "description": "Total estimated time in minutes"
+    },
+    "estimated_cost_eur": {
+      "type": "number",
+      "description": "Estimated cost in EUR"
+    },
+    "execution_results": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Step execution results"
+    },
+    "git_commit_sha": {
+      "type": "string",
+      "description": "Related Git commit SHA"
+    },
+    "deploy_url": {
+      "type": "string",
+      "description": "Deployment URL if applicable"
+    },
+    "audit_log_id": {
+      "type": "string",
+      "description": "Audit log reference"
+    },
+    "safety_blocked_reason": {
+      "type": "string",
+      "description": "Reason if blocked by safety guard"
+    }
+  },
+  "required": [
+    "request_id",
+    "requested_by",
+    "description"
+  ]
+}
