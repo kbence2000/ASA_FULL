@@ -1,0 +1,294 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Plus, GraduationCap, Play, Pause, CheckCircle, XCircle, Clock, TrendingUp, Zap } from 'lucide-react';
+
+export default function TrainingLab() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newSession, setNewSession] = useState({
+    name: '',
+    module_name: '',
+    status: 'pending',
+    epochs: 100,
+  });
+
+  const queryClient = useQueryClient();
+
+  const { data: sessions = [] } = useQuery({
+    queryKey: ['training-sessions'],
+    queryFn: () => base44.entities.TrainingSession.list('-created_date'),
+  });
+
+  const { data: modules = [] } = useQuery({
+    queryKey: ['modules'],
+    queryFn: () => base44.entities.AIModule.list(),
+  });
+
+  const createSessionMutation = useMutation({
+    mutationFn: (data) => base44.entities.TrainingSession.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['training-sessions']);
+      setDialogOpen(false);
+      setNewSession({ name: '', module_name: '', status: 'pending', epochs: 100 });
+    },
+  });
+
+  const updateSessionMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.TrainingSession.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries(['training-sessions']),
+  });
+
+  const getStatusIcon = (status) => {
+    const icons = {
+      pending: Clock,
+      running: Play,
+      completed: CheckCircle,
+      failed: XCircle,
+      paused: Pause,
+    };
+    return icons[status] || Clock;
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'text-slate-400 bg-slate-500/10 border-slate-500/30',
+      running: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
+      completed: 'text-green-400 bg-green-500/10 border-green-500/30',
+      failed: 'text-red-400 bg-red-500/10 border-red-500/30',
+      paused: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+    };
+    return colors[status] || colors.pending;
+  };
+
+  const runningSessions = sessions.filter(s => s.status === 'running').length;
+  const completedSessions = sessions.filter(s => s.status === 'completed').length;
+  const failedSessions = sessions.filter(s => s.status === 'failed').length;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold text-white mb-2 glow-text">Training Lab</h1>
+          <p className="text-slate-400">{sessions.length} training sessions</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700">
+              <Plus className="w-4 h-4 mr-2" />
+              New Training
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-slate-900 border-slate-800">
+            <DialogHeader>
+              <DialogTitle className="text-white">Start Training Session</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div>
+                <Label className="text-slate-300">Session Name</Label>
+                <Input
+                  value={newSession.name}
+                  onChange={(e) => setNewSession({ ...newSession, name: e.target.value })}
+                  placeholder="e.g., Paradox Engine V2 Training"
+                  className="bg-slate-800 border-slate-700 text-white mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-slate-300">Target Module</Label>
+                <Select value={newSession.module_name} onValueChange={(v) => setNewSession({ ...newSession, module_name: v })}>
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1">
+                    <SelectValue placeholder="Select module" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    {modules.map(module => (
+                      <SelectItem key={module.id} value={module.name} className="text-white">
+                        {module.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-slate-300">Epochs</Label>
+                <Input
+                  type="number"
+                  value={newSession.epochs}
+                  onChange={(e) => setNewSession({ ...newSession, epochs: parseInt(e.target.value) })}
+                  className="bg-slate-800 border-slate-700 text-white mt-1"
+                />
+              </div>
+
+              <Button
+                onClick={() => createSessionMutation.mutate(newSession)}
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600"
+                disabled={!newSession.name || !newSession.module_name}
+              >
+                Start Training
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-cyan-500/10">
+              <Play className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{runningSessions}</p>
+              <p className="text-xs text-slate-400">Running</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/10">
+              <CheckCircle className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{completedSessions}</p>
+              <p className="text-xs text-slate-400">Completed</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-red-500/10">
+              <XCircle className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{failedSessions}</p>
+              <p className="text-xs text-slate-400">Failed</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/10">
+              <TrendingUp className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">98.4%</p>
+              <p className="text-xs text-slate-400">Avg Accuracy</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Training Sessions */}
+      <div className="space-y-4">
+        {sessions.map((session) => {
+          const StatusIcon = getStatusIcon(session.status);
+          const statusColor = getStatusColor(session.status);
+          const progress = session.progress || 0;
+
+          return (
+            <Card key={session.id} className="bg-slate-900/50 border-slate-800 backdrop-blur-sm hover:border-indigo-500/30 transition-all">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className={`p-3 rounded-xl ${statusColor} border`}>
+                      <StatusIcon className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-white">{session.name}</h3>
+                        <Badge className={`${statusColor} border`}>
+                          {session.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm mb-3">
+                        <span className="text-slate-400">
+                          Module: <span className="text-cyan-400">{session.module_name}</span>
+                        </span>
+                        {session.epochs && (
+                          <span className="text-slate-400">
+                            Epochs: <span className="text-white">{session.current_epoch || 0}/{session.epochs}</span>
+                          </span>
+                        )}
+                        {session.accuracy && (
+                          <span className="text-slate-400">
+                            Accuracy: <span className="text-green-400">{session.accuracy}%</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {session.status === 'running' && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs text-slate-400">
+                            <span>Training Progress</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2 bg-slate-800" />
+                        </div>
+                      )}
+
+                      {session.loss && (
+                        <div className="flex gap-6 mt-3">
+                          <div className="flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-yellow-400" />
+                            <span className="text-sm text-slate-400">Loss: <span className="text-white">{session.loss}</span></span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-green-400" />
+                            <span className="text-sm text-slate-400">Accuracy: <span className="text-white">{session.accuracy}%</span></span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {session.status === 'running' && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => updateSessionMutation.mutate({ id: session.id, data: { status: 'paused' } })}
+                        className="border-slate-700 text-slate-300"
+                      >
+                        <Pause className="w-4 h-4 mr-2" />
+                        Pause
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {session.started_at && (
+                  <div className="text-xs text-slate-500">
+                    Started: {new Date(session.started_at).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+
+        {sessions.length === 0 && (
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm p-12">
+            <div className="text-center">
+              <GraduationCap className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-400">No training sessions yet</p>
+              <p className="text-sm text-slate-500 mt-2">Start training your AI modules to improve their performance</p>
+            </div>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
