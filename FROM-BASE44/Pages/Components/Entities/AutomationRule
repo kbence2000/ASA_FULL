@@ -1,0 +1,64 @@
+{
+  "name": "AutomationRule",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Automation rule name"
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": [
+        "schedule",
+        "threshold",
+        "event",
+        "manual"
+      ],
+      "description": "Type of trigger"
+    },
+    "trigger_config": {
+      "type": "object",
+      "description": "Trigger configuration"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "start_module",
+        "stop_module",
+        "restart_module",
+        "train",
+        "deploy",
+        "alert",
+        "execute_code"
+      ],
+      "description": "Action to perform"
+    },
+    "target_modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Target module names"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Rule enabled status"
+    },
+    "last_triggered": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last trigger timestamp"
+    },
+    "execution_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of times executed"
+    }
+  },
+  "required": [
+    "name",
+    "trigger_type",
+    "action_type"
+  ]
+}
