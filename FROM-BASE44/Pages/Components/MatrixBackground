@@ -1,0 +1,150 @@
+import React, { useEffect, useRef } from 'react';
+
+export default function MatrixBackground() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas size
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Matrix rain configuration
+    const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const fontSize = 14;
+    const columns = canvas.width / fontSize;
+    const drops = Array(Math.floor(columns)).fill(1);
+
+    // Heartbeat pulses
+    const pulses = [];
+    const createPulse = () => {
+      if (Math.random() > 0.98) {
+        pulses.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: 0,
+          maxRadius: 50 + Math.random() * 50,
+          alpha: 1,
+        });
+      }
+    };
+
+    // Data flow lines
+    const dataFlows = [];
+    const createDataFlow = () => {
+      if (Math.random() > 0.99) {
+        dataFlows.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          length: 100 + Math.random() * 200,
+          speed: 2 + Math.random() * 3,
+          alpha: 0.8,
+        });
+      }
+    };
+
+    // Animation loop
+    const animate = () => {
+      // Semi-transparent background for trail effect
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw matrix rain
+      ctx.fillStyle = 'rgba(99, 102, 241, 0.8)';
+      ctx.font = `${fontSize}px monospace`;
+
+      for (let i = 0; i < drops.length; i++) {
+        const char = chars[Math.floor(Math.random() * chars.length)];
+        const x = i * fontSize;
+        const y = drops[i] * fontSize;
+
+        ctx.fillStyle = `rgba(99, 102, 241, ${Math.random() * 0.5 + 0.5})`;
+        ctx.fillText(char, x, y);
+
+        if (y > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+
+      // Create new pulses
+      createPulse();
+
+      // Draw and update heartbeat pulses
+      pulses.forEach((pulse, index) => {
+        ctx.beginPath();
+        ctx.arc(pulse.x, pulse.y, pulse.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(99, 102, 241, ${pulse.alpha * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Inner glow
+        ctx.beginPath();
+        ctx.arc(pulse.x, pulse.y, pulse.radius * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(99, 102, 241, ${pulse.alpha * 0.2})`;
+        ctx.fill();
+
+        pulse.radius += 2;
+        pulse.alpha -= 0.02;
+
+        if (pulse.alpha <= 0 || pulse.radius > pulse.maxRadius) {
+          pulses.splice(index, 1);
+        }
+      });
+
+      // Create new data flows
+      createDataFlow();
+
+      // Draw data flows
+      dataFlows.forEach((flow, index) => {
+        const gradient = ctx.createLinearGradient(flow.x, flow.y, flow.x + flow.length, flow.y);
+        gradient.addColorStop(0, 'rgba(6, 182, 212, 0)');
+        gradient.addColorStop(0.5, `rgba(6, 182, 212, ${flow.alpha})`);
+        gradient.addColorStop(1, 'rgba(6, 182, 212, 0)');
+
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(flow.x, flow.y);
+        ctx.lineTo(flow.x + flow.length, flow.y);
+        ctx.stroke();
+
+        flow.x += flow.speed;
+        flow.alpha -= 0.01;
+
+        if (flow.x > canvas.width + flow.length || flow.alpha <= 0) {
+          dataFlows.splice(index, 1);
+        }
+      });
+
+      requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed top-0 left-0 w-full h-full pointer-events-none"
+      style={{ 
+        zIndex: 0,
+        willChange: 'transform',
+        transform: 'translateZ(0)',
+        imageRendering: 'high-quality'
+      }}
+    />
+  );
+}
