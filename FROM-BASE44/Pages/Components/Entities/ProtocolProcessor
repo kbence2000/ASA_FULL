@@ -1,0 +1,51 @@
+{
+  "name": "ProtocolProcessor",
+  "type": "object",
+  "properties": {
+    "processor_id": {
+      "type": "string",
+      "description": "Unique processor identifier"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "HOT",
+        "COLD",
+        "OFFLINE"
+      ],
+      "default": "COLD",
+      "description": "Current processor state"
+    },
+    "current_load": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0,
+      "description": "Current load 0-1"
+    },
+    "tasks_processed": {
+      "type": "number",
+      "default": 0,
+      "description": "Total tasks processed"
+    },
+    "uptime_minutes": {
+      "type": "number",
+      "default": 0,
+      "description": "Total uptime in minutes"
+    },
+    "last_task_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last task timestamp"
+    },
+    "error_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Total errors encountered"
+    }
+  },
+  "required": [
+    "processor_id",
+    "state"
+  ]
+}
