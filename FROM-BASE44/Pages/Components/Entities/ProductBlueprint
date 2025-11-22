@@ -1,0 +1,64 @@
+{
+  "name": "ProductBlueprint",
+  "type": "object",
+  "properties": {
+    "idea": {
+      "type": "string",
+      "description": "Product idea / domination goal"
+    },
+    "persona": {
+      "type": "string",
+      "description": "Target user / buyer persona"
+    },
+    "complexity": {
+      "type": "string",
+      "enum": [
+        "mvp",
+        "pro",
+        "enterprise"
+      ],
+      "default": "enterprise",
+      "description": "Complexity level"
+    },
+    "constraints": {
+      "type": "string",
+      "description": "Constraints / non-negotiables"
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Target platforms"
+    },
+    "summary": {
+      "type": "string",
+      "description": "High-level blueprint summary"
+    },
+    "architecture": {
+      "type": "string",
+      "description": "Architecture blueprint"
+    },
+    "fileTree": {
+      "type": "string",
+      "description": "Generated file tree structure"
+    },
+    "pipelines": {
+      "type": "string",
+      "description": "CI/CD pipeline configuration"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "spawning",
+        "completed",
+        "failed"
+      ],
+      "default": "spawning",
+      "description": "Blueprint generation status"
+    }
+  },
+  "required": [
+    "idea"
+  ]
+}
