@@ -1,0 +1,74 @@
+{
+  "name": "HypervisorTask",
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Unique task identifier"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "openai-chat",
+        "scramble-data",
+        "descramble-data"
+      ],
+      "default": "openai-chat",
+      "description": "Task type"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Task execution status"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Task payload (messages, config, etc.)"
+    },
+    "raw_output": {
+      "type": "string",
+      "description": "Raw unscrambled output"
+    },
+    "scrambled_output": {
+      "type": "string",
+      "description": "Scrambled output for secure transmission"
+    },
+    "scramble_key": {
+      "type": "string",
+      "description": "Key derived from payload for scrambling"
+    },
+    "rx_channel": {
+      "type": "string",
+      "default": "rx-main",
+      "description": "RX channel ID"
+    },
+    "tx_channel": {
+      "type": "string",
+      "default": "tx-main",
+      "description": "TX channel ID"
+    },
+    "model": {
+      "type": "string",
+      "default": "gpt-4",
+      "description": "AI model used"
+    },
+    "execution_time_ms": {
+      "type": "number",
+      "description": "Execution time in milliseconds"
+    },
+    "error_log": {
+      "type": "string",
+      "description": "Error details if failed"
+    }
+  },
+  "required": [
+    "task_id",
+    "type"
+  ]
+}
