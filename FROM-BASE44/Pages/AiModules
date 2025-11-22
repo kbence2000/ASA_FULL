@@ -1,0 +1,172 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import ModuleCard from '../components/modules/ModuleCard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, Plus, Filter } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const categories = [
+  { value: 'all', label: 'All Modules', count: 33 },
+  { value: 'CORE_SUPERSTRUCTURES', label: 'Core Superstructures', count: 7 },
+  { value: 'HIGH_TIER_AI_ENTITIES', label: 'High-Tier AI Entities', count: 6 },
+  { value: 'DEFENSE_SHIELD_SYSTEMS', label: 'Defense / Shield Systems', count: 6 },
+  { value: 'MATHEMATICAL_SIGNAL_AIS', label: 'Mathematical + Signal AIs', count: 5 },
+  { value: 'DEVELOPMENT_BOOSTERS', label: 'Development Boosters', count: 5 },
+  { value: 'ORCHESTRATION_LAYER', label: 'Orchestration Layer', count: 4 },
+];
+
+export default function AIModules() {
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newModule, setNewModule] = useState({
+    name: '',
+    category: 'CORE_SUPERSTRUCTURES',
+    status: 'standby',
+    description: '',
+  });
+
+  const queryClient = useQueryClient();
+
+  const { data: modules = [], isLoading } = useQuery({
+    queryKey: ['modules'],
+    queryFn: () => base44.entities.AIModule.list('-updated_date'),
+  });
+
+  const createModuleMutation = useMutation({
+    mutationFn: (data) => base44.entities.AIModule.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['modules']);
+      setDialogOpen(false);
+      setNewModule({ name: '', category: 'CORE_SUPERSTRUCTURES', status: 'standby', description: '' });
+    },
+  });
+
+  const filteredModules = modules.filter(module => {
+    const matchesCategory = selectedCategory === 'all' || module.category === selectedCategory;
+    const matchesSearch = module.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold text-white mb-2">AI Modules</h1>
+          <p className="text-slate-400">{modules.length} modules across 6 categories</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Module
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-slate-900 border-slate-800">
+            <DialogHeader>
+              <DialogTitle className="text-white">Create New AI Module</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div>
+                <Label className="text-slate-300">Module Name</Label>
+                <Input
+                  value={newModule.name}
+                  onChange={(e) => setNewModule({ ...newModule, name: e.target.value })}
+                  placeholder="e.g., Paradox Engine"
+                  className="bg-slate-800 border-slate-700 text-white mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Category</Label>
+                <Select value={newModule.category} onValueChange={(v) => setNewModule({ ...newModule, category: v })}>
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    {categories.slice(1).map(cat => (
+                      <SelectItem key={cat.value} value={cat.value} className="text-white">
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-slate-300">Description</Label>
+                <Input
+                  value={newModule.description}
+                  onChange={(e) => setNewModule({ ...newModule, description: e.target.value })}
+                  placeholder="Module description..."
+                  className="bg-slate-800 border-slate-700 text-white mt-1"
+                />
+              </div>
+              <Button
+                onClick={() => createModuleMutation.mutate(newModule)}
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600"
+                disabled={!newModule.name}
+              >
+                Create Module
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search modules..."
+            className="pl-10 bg-slate-900/50 border-slate-800 text-white"
+          />
+        </div>
+        <Button variant="outline" className="border-slate-800 text-slate-300">
+          <Filter className="w-4 h-4 mr-2" />
+          Filters
+        </Button>
+      </div>
+
+      {/* Category Tabs */}
+      <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
+        <TabsList className="bg-slate-900/50 border border-slate-800 p-1">
+          {categories.map(cat => (
+            <TabsTrigger
+              key={cat.value}
+              value={cat.value}
+              className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-slate-400"
+            >
+              {cat.label}
+              <span className="ml-2 text-xs opacity-60">({cat.count})</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      {/* Modules Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {isLoading ? (
+          Array(6).fill(0).map((_, i) => (
+            <div key={i} className="h-64 rounded-lg bg-slate-900/50 animate-pulse" />
+          ))
+        ) : filteredModules.length > 0 ? (
+          filteredModules.map(module => (
+            <ModuleCard key={module.id} module={module} />
+          ))
+        ) : (
+          <div className="col-span-full text-center py-12">
+            <p className="text-slate-400">No modules found</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
