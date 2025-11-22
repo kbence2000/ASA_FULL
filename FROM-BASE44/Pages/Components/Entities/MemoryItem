@@ -1,0 +1,74 @@
+{
+  "name": "MemoryItem",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "description": "User who owns this memory"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "FACT",
+        "PREFERENCE",
+        "TASK",
+        "INSIGHT",
+        "OTHER"
+      ],
+      "default": "OTHER",
+      "description": "Memory type classification"
+    },
+    "importance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.5,
+      "description": "Importance score 0-1"
+    },
+    "recencyScore": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 1.0,
+      "description": "Recency score with decay over time"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "user",
+        "assistant",
+        "system",
+        "agent"
+      ],
+      "default": "user",
+      "description": "Source of the memory"
+    },
+    "content": {
+      "type": "string",
+      "description": "The actual memory content"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Memory tags"
+    },
+    "embedding": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Vector embedding for similarity search"
+    },
+    "meta": {
+      "type": "object",
+      "description": "Additional metadata"
+    }
+  },
+  "required": [
+    "userId",
+    "content"
+  ]
+}
