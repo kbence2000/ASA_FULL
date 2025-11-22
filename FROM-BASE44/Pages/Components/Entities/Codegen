@@ -1,0 +1,71 @@
+import React from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+export default function BugAnalyzer({ bugs }) {
+  const getSeverityIcon = (severity) => {
+    switch (severity) {
+      case 'high':
+        return <AlertCircle className="w-4 h-4 text-red-400" />;
+      case 'medium':
+        return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
+      default:
+        return <Info className="w-4 h-4 text-blue-400" />;
+    }
+  };
+
+  const getSeverityColor = (severity) => {
+    switch (severity) {
+      case 'high':
+        return 'bg-red-500/10 text-red-400 border-red-500/30';
+      case 'medium':
+        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+      default:
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+    }
+  };
+
+  if (!bugs || bugs.length === 0) {
+    return (
+      <Card className="bg-slate-900/50 border-slate-800 p-8 text-center">
+        <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-white mb-2">No Bugs Found!</h3>
+        <p className="text-sm text-slate-400">Your code looks clean and ready to deploy.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {bugs.map((bug, idx) => (
+        <Card key={idx} className="bg-slate-900/50 border-slate-800 p-4">
+          <div className="flex items-start gap-3">
+            {getSeverityIcon(bug.severity)}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge className={getSeverityColor(bug.severity)}>
+                  {bug.severity}
+                </Badge>
+                {bug.line && (
+                  <span className="text-xs text-slate-500">Line {bug.line}</span>
+                )}
+              </div>
+              <p className="text-sm text-white mb-2">{bug.description}</p>
+              {bug.fix && (
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 mb-2">
+                  <p className="text-xs text-slate-300 mb-1 font-semibold">Suggested Fix:</p>
+                  <p className="text-xs text-slate-400">{bug.fix}</p>
+                </div>
+              )}
+              <Button size="sm" variant="outline" className="border-slate-700 text-xs">
+                Apply Fix
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
