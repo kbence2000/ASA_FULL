@@ -1,0 +1,465 @@
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { 
+  GitBranch, RefreshCw, Zap, Clock, CheckCircle2, XCircle, 
+  AlertTriangle, TrendingUp, Code2, Loader2, Play, Pause,
+  Github, FileCode, Activity, Shield, Circle
+} from 'lucide-react';
+import { toast } from 'sonner';
+import SyncPipelineVisualizer from '../components/sync/SyncPipelineVisualizer';
+
+export default function AutoSync() {
+  const queryClient = useQueryClient();
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [nextSyncCountdown, setNextSyncCountdown] = useState(600);
+
+  const { data: syncs = [] } = useQuery({
+    queryKey: ['sourceCodeSyncs'],
+    queryFn: () => base44.entities.SourceCodeSync.list('-created_date', 50),
+    refetchInterval: 30000,
+  });
+
+  const { data: pipelines = [] } = useQuery({
+    queryKey: ['cicdPipelines'],
+    queryFn: () => base44.entities.CICDPipeline.list('-created_date', 10),
+  });
+
+  const { data: config } = useQuery({
+    queryKey: ['syncConfig'],
+    queryFn: async () => {
+      const configs = await base44.entities.SyncConfig.list('-created_date', 1);
+      return configs[0] || null;
+    },
+  });
+
+  const updateConfig = useMutation({
+    mutationFn: (data) => {
+      if (config?.id) {
+        return base44.entities.SyncConfig.update(config.id, data);
+      }
+      return base44.entities.SyncConfig.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['syncConfig']);
+      toast.success('Configuration updated');
+    },
+  });
+
+  const triggerSync = useMutation({
+    mutationFn: async () => {
+      const syncId = `sync-${Date.now()}`;
+      const sync = await base44.entities.SourceCodeSync.create({
+        sync_id: syncId,
+        status: 'pending',
+        next_sync_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      });
+
+      // Trigger AI agent to analyze and sync
+      toast.success('Auto-Sync triggered! AI is analyzing changes...');
+      
+      return sync;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['sourceCodeSyncs']);
+      setNextSyncCountdown(600);
+    },
+  });
+
+  useEffect(() => {
+    if (!autoSyncEnabled) return;
+
+    const interval = setInterval(() => {
+      setNextSyncCountdown((prev) => {
+        if (prev <= 1) {
+          triggerSync.mutate();
+          return 600;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [autoSyncEnabled]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle2 className="w-5 h-5 text-green-400" />;
+      case 'failed':
+        return <XCircle className="w-5 h-5 text-red-400" />;
+      case 'analyzing':
+      case 'syncing':
+      case 'deploying':
+        return <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />;
+      case 'skipped':
+        return <AlertTriangle className="w-5 h-5 text-yellow-400" />;
+      default:
+        return <Clock className="w-5 h-5 text-slate-400" />;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-500/10 text-green-400 border-green-500/30';
+      case 'failed':
+        return 'bg-red-500/10 text-red-400 border-red-500/30';
+      case 'analyzing':
+      case 'syncing':
+      case 'deploying':
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+      case 'skipped':
+        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+      default:
+        return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+    }
+  };
+
+  const latestSync = syncs[0];
+  const totalSyncs = syncs.length;
+  const completedSyncs = syncs.filter(s => s.status === 'completed').length;
+  const successRate = totalSyncs > 0 ? ((completedSyncs / totalSyncs) * 100).toFixed(1) : 100;
+
+  return (
+    <div className="max-w-[2000px] mx-auto">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 glow-text">Auto-Sync Master</h1>
+          <p className="text-slate-400 text-sm">Automated source code monitoring, workflow sync & GitHub deployment</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => triggerSync.mutate()}
+            disabled={!autoSyncEnabled || triggerSync.isPending}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600"
+          >
+            {triggerSync.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Sync Now
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Control Panel */}
+      <Card className="bg-slate-900/50 border-slate-800 p-6 mb-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className={`p-4 rounded-xl ${autoSyncEnabled ? 'bg-green-500/10' : 'bg-slate-800/50'} border ${autoSyncEnabled ? 'border-green-500/30' : 'border-slate-700'}`}>
+              {autoSyncEnabled ? (
+                <Zap className="w-8 h-8 text-green-400 heartbeat" />
+              ) : (
+                <Pause className="w-8 h-8 text-slate-500" />
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-xl font-bold text-white">Auto-Sync Status</h2>
+                <Badge className={autoSyncEnabled ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-slate-500/10 text-slate-400 border-slate-500/30'}>
+                  {autoSyncEnabled ? 'Active' : 'Paused'}
+                </Badge>
+              </div>
+              <p className="text-sm text-slate-400">
+                {autoSyncEnabled ? 'Monitoring every 10 minutes' : 'Automatic sync is paused'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-xs text-slate-400 mb-1">Next Sync In</p>
+              <p className="text-2xl font-bold text-cyan-400 font-mono">{formatTime(nextSyncCountdown)}</p>
+            </div>
+            <Switch
+              checked={autoSyncEnabled}
+              onCheckedChange={setAutoSyncEnabled}
+              className="data-[state=checked]:bg-green-500"
+            />
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        {autoSyncEnabled && (
+          <div className="mt-4">
+            <Progress 
+              value={((600 - nextSyncCountdown) / 600) * 100} 
+              className="h-2"
+            />
+          </div>
+        )}
+      </Card>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="bg-slate-900/50 border-slate-800 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/10">
+              <CheckCircle2 className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Success Rate</p>
+              <p className="text-xl font-bold text-white">{successRate}%</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-cyan-500/10">
+              <GitBranch className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Total Syncs</p>
+              <p className="text-xl font-bold text-white">{totalSyncs}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/10">
+              <Code2 className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Files Changed</p>
+              <p className="text-xl font-bold text-white">
+                {syncs.reduce((sum, s) => sum + (s.files_changed || 0), 0)}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-900/50 border-slate-800 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-indigo-500/10">
+              <Activity className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Active Pipelines</p>
+              <p className="text-xl font-bold text-white">{pipelines.filter(p => p.status === 'running').length}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Pipeline Visualizer */}
+      {latestSync && (
+        <div className="mb-6">
+          <SyncPipelineVisualizer sync={latestSync} />
+        </div>
+      )}
+
+      {/* Latest Sync Details */}
+      {latestSync && (
+        <Card className="bg-slate-900/50 border-slate-800 p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="w-5 h-5 text-indigo-400" />
+            <h2 className="text-lg font-bold text-white">Latest Sync</h2>
+            <Badge className={getStatusColor(latestSync.status)}>
+              {latestSync.status}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="p-3 rounded-lg bg-slate-800/50">
+              <p className="text-xs text-slate-400 mb-1">Approval Score</p>
+              <div className="flex items-center gap-2">
+                <Progress value={latestSync.approval_score || 0} className="h-2 flex-1" />
+                <span className="text-sm font-bold text-cyan-400">{latestSync.approval_score || 0}%</span>
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-800/50">
+              <p className="text-xs text-slate-400 mb-1">Files Changed</p>
+              <p className="text-lg font-bold text-white">{latestSync.files_changed || 0}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-800/50">
+              <p className="text-xs text-slate-400 mb-1">Auto-Approved</p>
+              <div className="flex items-center gap-2">
+                {latestSync.auto_approved ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    <span className="text-sm text-green-400">Yes</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4 text-red-400" />
+                    <span className="text-sm text-red-400">No</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {latestSync.workflows_synced && latestSync.workflows_synced.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs text-slate-400 mb-2">Synced Workflows</p>
+              <div className="flex flex-wrap gap-2">
+                {latestSync.workflows_synced.map((workflow, idx) => (
+                  <Badge key={idx} variant="outline" className="border-indigo-500/30 text-indigo-400">
+                    {workflow}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {latestSync.github_push_url && (
+            <a
+              href={latestSync.github_push_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700 transition-all"
+            >
+              <Github className="w-5 h-5 text-slate-400" />
+              <div className="flex-1">
+                <p className="text-sm text-white font-medium">View on GitHub</p>
+                <p className="text-xs text-slate-500">{latestSync.github_commit_sha?.slice(0, 7)}</p>
+              </div>
+            </a>
+          )}
+        </Card>
+      )}
+
+      {/* Configuration Panel */}
+      <Card className="bg-slate-900/50 border-slate-800 p-6 mb-6">
+        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-purple-400" />
+          TAC Super Sync Configuration
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">Git Branch</label>
+              <input
+                type="text"
+                value={config?.git_branch || 'main'}
+                onChange={(e) => updateConfig.mutate({ ...config, git_branch: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">Build Command</label>
+              <input
+                type="text"
+                value={config?.build_command || ''}
+                onChange={(e) => updateConfig.mutate({ ...config, build_command: e.target.value })}
+                placeholder="npm run build"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">Test Command</label>
+              <input
+                type="text"
+                value={config?.test_command || ''}
+                onChange={(e) => updateConfig.mutate({ ...config, test_command: e.target.value })}
+                placeholder="npm test"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+              />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">Deploy Webhook URL</label>
+              <input
+                type="text"
+                value={config?.deploy_webhook_url || ''}
+                onChange={(e) => updateConfig.mutate({ ...config, deploy_webhook_url: e.target.value })}
+                placeholder="https://deploy.example.com/webhook"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
+              <div>
+                <p className="text-sm text-white font-medium">AI Risk Analysis</p>
+                <p className="text-xs text-slate-500">Use AI to analyze change risk</p>
+              </div>
+              <Switch
+                checked={config?.use_ai_review ?? true}
+                onCheckedChange={(checked) => updateConfig.mutate({ ...config, use_ai_review: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
+              <div>
+                <p className="text-sm text-white font-medium">Auto Deploy (Low Risk)</p>
+                <p className="text-xs text-slate-500">Auto-deploy low risk changes</p>
+              </div>
+              <Switch
+                checked={config?.auto_deploy_on_low_risk ?? true}
+                onCheckedChange={(checked) => updateConfig.mutate({ ...config, auto_deploy_on_low_risk: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
+              <div>
+                <p className="text-sm text-white font-medium">Auto Deploy (Medium Risk)</p>
+                <p className="text-xs text-slate-500">Auto-deploy medium risk changes</p>
+              </div>
+              <Switch
+                checked={config?.auto_deploy_on_medium_risk ?? false}
+                onCheckedChange={(checked) => updateConfig.mutate({ ...config, auto_deploy_on_medium_risk: checked })}
+              />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Sync History */}
+      <Card className="bg-slate-900/50 border-slate-800 p-6">
+        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-indigo-400" />
+          Sync History
+        </h2>
+        <div className="space-y-3">
+          {syncs.slice(0, 10).map((sync) => (
+            <div
+              key={sync.id}
+              className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-slate-700 transition-all"
+            >
+              <div className="flex items-center gap-3 flex-1">
+                {getStatusIcon(sync.status)}
+                <div>
+                  <p className="text-sm font-medium text-white">{sync.sync_id}</p>
+                  <p className="text-xs text-slate-500">
+                    {new Date(sync.created_date).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {sync.files_changed > 0 && (
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400">Files</p>
+                    <p className="text-sm font-bold text-cyan-400">{sync.files_changed}</p>
+                  </div>
+                )}
+                <Badge className={getStatusColor(sync.status)}>
+                  {sync.status}
+                </Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
